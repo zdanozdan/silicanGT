@@ -44,9 +44,10 @@ class Window(QMainWindow):
         self.socketthread.start()
         self.thread.start()
 
+        self.login()
+
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #self.sock.settimeout(5)
         self.sock.connect(silican_address)
         self.statusBar().showMessage('Connected to silican on socket %s:%s' %silican_address)
 
@@ -68,7 +69,7 @@ class Window(QMainWindow):
 
     def signal_sync_db(self,msg):
         self.centralWidget.model.select()
-        print(msg)
+        print(msg,"signal_sync_db")
 
     def signal_status(self,msg):
         if msg[0] == FRAME_EXCEPTION:
@@ -86,6 +87,25 @@ class Window(QMainWindow):
 
     def history(self):
         self.thread._db_signal.emit(1)
+
+        xml_string = "<XCTIP><Calls><Change_EV><Src_Id>1001</Src_Id><Dst_Id>1001</Dst_Id><CallsState>NewCall_ST</CallsState><CR>15822</CR><Calling><Number>123123123</Number></Calling><Colp><Number>201</Number><Comment>Abonent 201</Comment></Colp><Called><Number>615555555</Number></Called></Change_EV></Calls></XCTIP>"
+        
+        elem = ET.fromstring(xml_string)
+        #ET.dump(elem)
+
+        change = elem.findall(".//Change_EV")
+        for row in change:
+            calling = row.find(".//Calling")
+            if calling is not None:
+                calling = calling.find(".//Number")
+                print(calling.text)
+            called = row.find(".//Called")
+            if called is not None:
+                called = called.find(".//Number")
+                print(called.text)
+            calls_state = row.find(".//CallsState")
+            if calls_state is not None:
+                print(calls_state.text)
         
     def ping(self):
         message = b'<XCTIP><Stream><WDTest></WDTest></Stream></XCTIP>'
@@ -144,6 +164,26 @@ class SocketThread(QThread):
                     ET.dump(elem)
                     return elem
 
+#  <Calls>
+#    <Change_EV>
+#      <Src_Id>1001</Src_Id>
+#      <Dst_Id>1001</Dst_Id>
+#      <CallsState>Disconnect_ST</CallsState>
+#      <CR>15822</CR>
+#    </Change_EV>
+#  </Calls>
+#</XCTIP>
+#<XCTIP>
+#  <Calls>
+#    <Change_EV>
+#      <Src_Id>1001</Src_Id>
+#      <Dst_Id>1001</Dst_Id>
+#      <CallsState>Release_ST</CallsState>
+#      <CR>15822</CR>
+#    </Change_EV>
+#  </Calls>
+#</XCTIP>
+
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
         while True:
@@ -158,7 +198,18 @@ class SocketThread(QThread):
                 change = elem.findall(".//Change_EV")
                 for row in change:
                     print(ET.tostring(row))
-                    #self._signal.emit(ET.tostring(row).encode('UTF-8'))
+                    calling = row.find(".//Calling/Number")
+                    if calling:
+                        print(calling.text)
+                    called = row.find(".//Called/Number")
+                    if called:
+                        print(called.text)
+                    calls_state = row.find(".//CallsState")
+                    if calls_state:
+                        print(calls_state.text)
+
+                    self._signal.emit(ET.tostring(row).encode('UTF-8'))
+                    
                 log = elem.findall(".//LogInfo_ANS")
                 for row in log:
                     comment = row.find('Comment').text

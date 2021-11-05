@@ -18,6 +18,7 @@ class CallHistoryThread(QThread):
         super(CallHistoryThread, self).__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect(silican_address)
+        self.sock.settimeout(5)
         self.init_db()
 
         #<Row>
@@ -39,7 +40,14 @@ class CallHistoryThread(QThread):
         c = conn.cursor()
         #c.execute('DROP TABLE history_calls')
         c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255) PRIMARY KEY, row_type var_char(32), sync_type varchar(255), hid INTEGER UNIQUE, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER)')        
-        conn.commit()        
+        conn.commit()
+
+        c.execute('SELECT marker,start_time FROM history_calls ORDER BY hid DESC')
+        try:
+            last = c.fetchone()
+            self.last_marker = last[0]
+        except Exception:
+            self.last_marker = ''        
 
     def __del__(self):
         self.wait()
@@ -72,7 +80,7 @@ class CallHistoryThread(QThread):
 
         self.login()
         frames = 2
-        self.request_marker('',frames)
+        self.request_marker(self.last_marker,frames)
 
         while True:
             try:
@@ -113,10 +121,15 @@ class CallHistoryThread(QThread):
                             print(str(e))
 
                         self.request_marker(marker,1)
+                        self.last_marker = marker
 
+            except socket.timeout as t:
+                self.request_marker(self.last_marker,1)
+                
             except Exception as e:
-                raise
-                print(str(e))
+                pass
+                #raise
+                #print(str(e))
             
         time.sleep(0.1)
         self._signal.emit(50)

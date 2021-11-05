@@ -39,7 +39,7 @@ class CallHistoryThread(QThread):
         conn = sqlite3.connect(local_db)
         c = conn.cursor()
         #c.execute('DROP TABLE history_calls')
-        c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255) PRIMARY KEY, row_type var_char(32), sync_type varchar(255), hid INTEGER UNIQUE, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER)')        
+        c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255) PRIMARY KEY, row_type var_char(32), sync_type varchar(255), hid INTEGER, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER)')        
         conn.commit()
 
         c.execute('SELECT marker,start_time FROM history_calls ORDER BY hid DESC')
@@ -47,7 +47,9 @@ class CallHistoryThread(QThread):
             last = c.fetchone()
             self.last_marker = last[0]
         except Exception:
-            self.last_marker = ''        
+            self.last_marker = ''
+
+        self.last_marker = ''
 
     def __del__(self):
         self.wait()
@@ -62,7 +64,7 @@ class CallHistoryThread(QThread):
             for event, elem in self.parser.read_events():
                 if elem.tag == 'XCTIP':
                     #print("READ FRAME",elem)
-                    #ET.dump(elem)
+                    ET.dump(elem)
                     return elem
 
     def login(self):
@@ -98,11 +100,17 @@ class CallHistoryThread(QThread):
                     if row_type == "RowEnd":
                         self._db_signal.emit(1)
                     
-                    if history_call:
+                    if history_call is not None:
                         h_id = history_call.find('HId').text
                         start_time = history_call.find('StartTime').text
-                        h_type = history_call.find('HType').text
-                        duration_time = history_call.find('DurationTime').text
+
+                        h_type='htype'
+                        if history_call.find('HType') is not None:
+                            h_type = history_call.find('HType').text
+
+                        duration_time=0
+                        if history_call.find('DurationTime') is not None:
+                            duration_time = history_call.find('DurationTime').text
                                     
                         dial_number = 0
                         if history_call.find('DialNumber') is not None:
@@ -120,16 +128,16 @@ class CallHistoryThread(QThread):
                         except sqlite3.IntegrityError as e:
                             print(str(e))
 
-                        self.request_marker(marker,1)
                         self.last_marker = marker
+                        self.request_marker(marker,1)
 
             except socket.timeout as t:
-                self.request_marker(self.last_marker,1)
+                print(self.last_marker)
+                self.request_marker(self.last_marker,2)
                 
             except Exception as e:
-                pass
-                #raise
-                #print(str(e))
+                raise
+                print(str(e))
             
         time.sleep(0.1)
         self._signal.emit(50)

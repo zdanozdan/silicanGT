@@ -14,6 +14,8 @@ import xml.etree.ElementTree as ET
 #Thread
 from sync import CallHistoryThread
 from conf import silican_address
+#sqlite
+import sqlite3
 
 FRAME_SUCCESS = 0
 FRAME_EXCEPTION = 1
@@ -31,9 +33,9 @@ class Window(QMainWindow):
         
         self.setCentralWidget(self.centralWidget)
 
-        con = QSqlDatabase.addDatabase("QSQLITE")
-        con.setDatabaseName("silican.sqlite")
-        if not con.open():
+        self.con = QSqlDatabase.addDatabase("QSQLITE",'db1')
+        self.con.setDatabaseName("silican.sqlite")
+        if not self.con.open():
             QMessageBox.critical(
                 None,
                 "Database silican.sqlite error!",
@@ -45,6 +47,11 @@ class Window(QMainWindow):
             """
             CREATE TABLE IF NOT EXISTS config (silican_address var_char(255), silican_port INTEGER, login varchar(255), password varchar(255))
             """)
+
+        #conn = sqlite3.connect("silican.sqlite")
+        #c = conn.cursor()
+        #c.execute('SELECT * FROM history_calls')
+        #print(c.fetchall())
 
         query.exec("SELECT * FROM config")
         if query.first() == False:
@@ -69,7 +76,10 @@ class Window(QMainWindow):
         index = query.record().indexOf('password')
         self.password = query.value(index)
 
-        print(self.silican_address,self.silican_port,self.login,self.password)
+        self.con.close()
+        del self.con
+
+        #print(self.silican_address,self.silican_port,self.login,self.password)
 
     def connect(self):
         try:
@@ -89,6 +99,7 @@ class Window(QMainWindow):
                 "Socket Error, check silican configuration",
                 "Connection Error: (%s)" % str(e),
             )
+            raise
 
     def send_socket(self,msg):
         try:
@@ -110,6 +121,7 @@ class Window(QMainWindow):
     def start(self):
         try:
             self.connect()
+            self.startButton.setEnabled(False)
             message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
             self.send_socket(message.encode('UTF-8'))
             self.start_workers()
@@ -194,10 +206,10 @@ class Window(QMainWindow):
         self.toolBar = QToolBar("My main toolbar")
         self.addToolBar(self.toolBar)
 
-        toolButton = QToolButton()
-        toolButton.setText("Start")
-        toolButton.clicked.connect(self.start)
-        self.toolBar.addWidget(toolButton)
+        self.startButton = QToolButton()
+        self.startButton.setText("Start")
+        self.startButton.clicked.connect(self.start)
+        self.toolBar.addWidget(self.startButton)
 
         toolButton = QToolButton()
         toolButton.setText("Ping")
@@ -315,7 +327,18 @@ class CentralWidget(QWidget):
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
 
+        con = QSqlDatabase.addDatabase("QSQLITE")
+        con.setDatabaseName("silican.sqlite")
+        if not con.open():
+            QMessageBox.critical(
+                None,
+                "Database silican.sqlite error!",
+                "Database Error: %s" % con.lastError().databaseText(),
+            )
+
         self.model = CallsQSqlTableModel(self)
+        #self.model.db = QSqlDatabase.addDatabase("QSQLITE")
+        #self.model.db.setDatabaseName("silican.sqlite")
         self.model.setTable("history_calls")  
         #self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
         self.model.setHeaderData(3, Qt.Horizontal, "ID połączenia")
@@ -325,6 +348,7 @@ class CentralWidget(QWidget):
         self.model.setHeaderData(7, Qt.Horizontal, "Długość połączenia (s)")
         self.model.setHeaderData(8, Qt.Horizontal, "Ilość prób")
         self.model.select()
+        print(self.model.rowCount())
 
         self.tableview = QTableView()
         self.tableview.setModel(self.model)
@@ -338,15 +362,15 @@ class CentralWidget(QWidget):
         self.tableview.setSortingEnabled(True)
         self.tableview.sortByColumn(0, Qt.DescendingOrder);
 
-        #self.model.select()
+        self.model.select()
 
         # filter proxy model
-        filter_proxy_model = QtCore.QSortFilterProxyModel()
-        filter_proxy_model.setSourceModel(self.model)
-        filter_proxy_model.setFilterKeyColumn(6) # sixth column
+        #filter_proxy_model = QtCore.QSortFilterProxyModel()
+        #filter_proxy_model.setSourceModel(self.model)
+        #filter_proxy_model.setFilterKeyColumn(6) # sixth column
 
         line_edit = QtWidgets.QLineEdit()
-        line_edit.textChanged.connect(filter_proxy_model.setFilterRegExp)
+        #line_edit.textChanged.connect(filter_proxy_model.setFilterRegExp)
 
         missed_checkbox = QtWidgets.QCheckBox("Nieodebrane")
         incoming_checkbox = QtWidgets.QCheckBox("Przychodzące")

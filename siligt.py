@@ -3,17 +3,16 @@
 import sys,socket,time
 from PyQt5 import QtCore
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
-from PyQt5.QtWidgets import QWidget, QPushButton, QProgressBar, QVBoxLayout, QApplication,QStatusBar,QMainWindow,QLabel,QMenuBar,QMenu,QAction,QToolBar,QToolButton,QTableView
+from PyQt5.QtWidgets import QWidget, QPushButton, QProgressBar, QVBoxLayout, QApplication,QStatusBar,QMainWindow,QLabel,QMenuBar,QMenu,QAction,QToolBar,QToolButton,QTableView,QMessageBox,QDialog
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
 from PyQt5.QtGui import QIcon
-from PyQt5.QtSql import QSqlDatabase, QSqlTableModel
+from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
 
 #XML
 import xml.etree.ElementTree as ET
 #Thread
 from sync import CallHistoryThread
-#conf
 from conf import silican_address
 
 FRAME_SUCCESS = 0
@@ -32,24 +31,64 @@ class Window(QMainWindow):
         
         self.setCentralWidget(self.centralWidget)
 
-        self.connect()
+        con = QSqlDatabase.addDatabase("QSQLITE")
+        con.setDatabaseName("silican.sqlite")
+        if not con.open():
+            QMessageBox.critical(
+                None,
+                "Database silican.sqlite error!",
+                "Database Error: %s" % con.lastError().databaseText(),
+            )
 
-        self.thread = CallHistoryThread()
-        self.thread._signal.connect(self.signal_accept)
-        self.thread._db_signal.connect(self.signal_sync_db)
+        query = QSqlQuery()
+        query.exec(
+            """
+            CREATE TABLE IF NOT EXISTS config (silican_address var_char(255), silican_port INTEGER, login varchar(255), password varchar(255))
+            """)
 
-        self.socketthread = SocketThread(self.sock)
-        self.socketthread._signal.connect(self.signal_status)
+        query.exec("SELECT * FROM config")
+        if query.first() == False:
+            model = QSqlTableModel(self)
+            model.setTable("config")
+            record = model.record()
+            record.setValue('silican_address', '192.168.0.22')
+            record.setValue('silican_port', '5529')
+            record.setValue('login', '201')
+            record.setValue('password', 'mikran123')
+            model.insertRecord(0, record)
 
-        self.socketthread.start()
-        self.thread.start()
+        index = query.record().indexOf('silican_address')
+        self.silican_address = query.value(index)
 
-        self.login()
+        index = query.record().indexOf('silican_port')
+        self.silican_port = query.value(index)
+
+        index = query.record().indexOf('login')
+        self.login = query.value(index)
+
+        index = query.record().indexOf('password')
+        self.password = query.value(index)
+
+        print(self.silican_address,self.silican_port,self.login,self.password)
 
     def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect(silican_address)
-        self.statusBar().showMessage('Connected to silican on socket %s:%s' %silican_address)
+        try:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.settimeout(3)
+            self.sock.connect((self.silican_address,self.silican_port))
+            self.sock.settimeout(None)
+            print((self.silican_address,self.silican_port))
+            self.statusBar().setStyleSheet("color: green")
+            self.statusBar().showMessage('Connected to silican on socket %s:%s' % (self.silican_address,self.silican_port))
+        except socket.error as e:
+            self.statusBar().setStyleSheet("color: red")
+            self.statusBar().showMessage('Error %s' % str(e))
+
+            QMessageBox.critical(
+                None,
+                "Socket Error, check silican configuration",
+                "Connection Error: (%s)" % str(e),
+            )
 
     def send_socket(self,msg):
         try:
@@ -58,10 +97,29 @@ class Window(QMainWindow):
             self.statusBar().setStyleSheet("color: red")
             self.statusBar().showMessage(str(e))
 
-    def login(self):
-        message = b'<?xml version="1.0" encoding="IBM852"?><XCTIP><Log><MakeLog><CId>12</CId><Login>201</Login><Pass>mikran123</Pass></MakeLog></Log></XCTIP>'
-        self.send_socket(message)
-        self.register_calls()
+    def start_workers(self):
+        self.thread = CallHistoryThread()
+        self.thread._signal.connect(self.signal_accept)
+        self.thread._db_signal.connect(self.signal_sync_db)
+        self.thread.start()
+    
+        self.socketthread = SocketThread(self.sock)
+        self.socketthread._signal.connect(self.signal_status)        
+        self.socketthread.start()
+
+    def start(self):
+        try:
+            self.connect()
+            message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
+            self.send_socket(message.encode('UTF-8'))
+            self.start_workers()
+            self.register_calls()
+        except Exception as e:
+            QMessageBox.critical(
+                None,
+                "Socket Error, check silican configuration",
+                "Connection Error: (%s)" % str(e),
+            )
 
     def register_calls(self):
         message = b'<?xml version="1.0" encoding="IBM852"?><XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
@@ -84,6 +142,27 @@ class Window(QMainWindow):
         if self.centralWidget.pbar.value() == 99:
             self.centralWidget.pbar.setValue(0)
         #    self.btn.setEnabled(True)
+
+    def settings(self):
+        self.settings_widget = QDialog()
+        self.settings_widget.setModal(True)
+
+        model = QSqlTableModel(self)
+        model.setTable("config")  
+        #self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
+        #model.setHeaderData(8, Qt.Horizontal, "Ilość prób")
+
+        tableview = QTableView()
+        tableview.setModel(model)
+        tableview.resizeColumnsToContents()
+        tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        tableview.setSortingEnabled(True)
+        tableview.sortByColumn(0, Qt.DescendingOrder);
+
+        vbox = QVBoxLayout()
+        vbox.addWidget(tableview)
+        self.settings_widget.setLayout(vbox)        
+        self.settings_widget.show()
 
     def history(self):
         self.thread._db_signal.emit(1)
@@ -116,8 +195,8 @@ class Window(QMainWindow):
         self.addToolBar(self.toolBar)
 
         toolButton = QToolButton()
-        toolButton.setText("Login")
-        toolButton.clicked.connect(self.login)
+        toolButton.setText("Start")
+        toolButton.clicked.connect(self.start)
         self.toolBar.addWidget(toolButton)
 
         toolButton = QToolButton()
@@ -128,6 +207,11 @@ class Window(QMainWindow):
         toolButton = QToolButton()
         toolButton.setText("History")
         toolButton.clicked.connect(self.history)
+        self.toolBar.addWidget(toolButton)
+
+        toolButton = QToolButton()
+        toolButton.setText("Settings")
+        toolButton.clicked.connect(self.settings)
         self.toolBar.addWidget(toolButton)
 
     def createMenuBar(self):
@@ -148,8 +232,8 @@ class SocketThread(QThread):
         super(SocketThread, self).__init__()
         self.sock = sock
 
-    def __del__(self):
-        self.wait()
+        #def __del__(self):
+        #self.wait()
 
     def read_frame(self):
         self.parser.feed("<root>")
@@ -231,15 +315,6 @@ class CentralWidget(QWidget):
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
 
-        con = QSqlDatabase.addDatabase("QSQLITE")
-        con.setDatabaseName("silican.sqlite")
-        if not con.open():
-            QMessageBox.critical(
-                None,
-                "Database silican.sqlite error!",
-                "Database Error: %s" % con.lastError().databaseText(),
-            )
-
         self.model = CallsQSqlTableModel(self)
         self.model.setTable("history_calls")  
         #self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
@@ -249,7 +324,7 @@ class CentralWidget(QWidget):
         self.model.setHeaderData(6, Qt.Horizontal, "Numer")
         self.model.setHeaderData(7, Qt.Horizontal, "Długość połączenia (s)")
         self.model.setHeaderData(8, Qt.Horizontal, "Ilość prób")
-        #self.model.select()
+        self.model.select()
 
         self.tableview = QTableView()
         self.tableview.setModel(self.model)
@@ -303,7 +378,6 @@ class CallsQSqlTableModel(QSqlTableModel):
    def data(self, QModelIndex, role=None):
        v = QSqlTableModel.data(self, QModelIndex, role);
        if role == QtCore.Qt.BackgroundRole:
-           #return QtGui.QColor(QtCore.Qt.gray)
            return QtGui.QColor(self._color)
 
        if role == Qt.DisplayRole or role == Qt.EditRole:

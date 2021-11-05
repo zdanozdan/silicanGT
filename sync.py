@@ -13,6 +13,7 @@ class DoneParsing(Exception):
 
 class CallHistoryThread(QThread):
     _signal = pyqtSignal(int)
+    _db_signal = pyqtSignal(int)
     def __init__(self):
         super(CallHistoryThread, self).__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -44,8 +45,6 @@ class CallHistoryThread(QThread):
         self.wait()
 
     def read_frame(self):
-        #parser = ET.XMLPullParser(['end'])
-
         self.parser.feed("<root>")
 
         while True:
@@ -54,8 +53,8 @@ class CallHistoryThread(QThread):
             self.parser.feed(data)
             for event, elem in self.parser.read_events():
                 if elem.tag == 'XCTIP':
-                    print("READ FRAME",elem)
-                    ET.dump(elem)
+                    #print("READ FRAME",elem)
+                    #ET.dump(elem)
                     return elem
 
     def login(self):
@@ -87,6 +86,10 @@ class CallHistoryThread(QThread):
                     row_type = row.find('RowType').text
                     sync_type = row.find('SyncType').text
                     history_call = row.find('HistoryCall')
+
+                    if row_type == "RowEnd":
+                        self._db_signal.emit(1)
+                    
                     if history_call:
                         h_id = history_call.find('HId').text
                         start_time = history_call.find('StartTime').text
@@ -113,7 +116,6 @@ class CallHistoryThread(QThread):
 
             except Exception as e:
                 raise
-        #pass
                 print(str(e))
             
         time.sleep(0.1)

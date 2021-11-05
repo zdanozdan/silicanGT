@@ -99,44 +99,42 @@ class CallHistoryThread(QThread):
 
                     if row_type == "RowEnd":
                         self._db_signal.emit(1)
-                    
-                    if history_call is not None:
-                        h_id = history_call.find('HId').text
-                        start_time = history_call.find('StartTime').text
+                        print("ROWEND")
+                        raise Exception('ROWEND')
 
-                        h_type='htype'
-                        if history_call.find('HType') is not None:
+                    if row_type == 'AddRow':
+                        if history_call is not None:
+                            start_time = history_call.find('StartTime').text
+                            h_id = history_call.find('HId').text
+
                             h_type = history_call.find('HType').text
-
-                        duration_time=0
-                        if history_call.find('DurationTime') is not None:
                             duration_time = history_call.find('DurationTime').text
                                     
-                        dial_number = 0
-                        if history_call.find('DialNumber') is not None:
-                            dial_number = history_call.find('DialNumber').text
-                                        
-                        attempts = 0
-                        if history_call.find('Attempts') is not None:
-                            attempts = history_call.find('Attempts').text
+                            dial_number = 0
+                            if history_call.find('DialNumber') is not None:
+                                dial_number = history_call.find('DialNumber').text
+                                
+                            attempts = 0
+                            if history_call.find('Attempts') is not None:
+                                attempts = history_call.find('Attempts').text
 
-                        data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts)
-                        try:
-                            c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?)", data)
-                            conn.commit()
-                            print(data)
-                        except sqlite3.IntegrityError as e:
-                            print(str(e))
+                            data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts)
+                            try:
+                                c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?)", data)
+                                conn.commit()
+                                print(data)
+                            except sqlite3.IntegrityError as e:
+                                print(str(e))
 
-                        self.last_marker = marker
-                        self.request_marker(marker,1)
+                    self.last_marker = marker
+                    self.request_marker(marker,1)
 
             except socket.timeout as t:
                 print(self.last_marker)
                 self.request_marker(self.last_marker,2)
                 
             except Exception as e:
-                raise
+                #raise
                 print(str(e))
             
         time.sleep(0.1)

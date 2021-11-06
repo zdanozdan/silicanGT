@@ -21,25 +21,31 @@ class CallHistoryThread(QThread):
         self.sock.settimeout(5)
         self.init_db()
 
-        #<Row>
-        #<Marker>CH000001F70000000A615ADCD703E986</Marker>
-        #<RowType>AddRow</RowType>
-        #<SyncType>HistoryCall</SyncType>
-        #<HistoryCall>
-        #  <HId>10</HId>
-        #  <StartTime>2021-10-04 13:23:14</StartTime>
-        #  <HType>MissedCall</HType>
-        #  <DialNumber>615555555</DialNumber>
-        #  <DurationTime>25</DurationTime>
-        #  <Attempts>1</Attempts>
-        #</HistoryCall>
-      #</Row>
+        """
+        <Row>
+        <Marker>CE000002CF00000C4F615ADCD703E960</Marker>
+        <RowType>AddRow</RowType>
+        <SyncType>HistoryCall</SyncType>
+        <HistoryCall>
+          <HId>3151</HId>
+          <StartTime>2021-11-06 11:40:26</StartTime>
+          <HType>MissedCall</HType>
+          <CNumber>0601570947</CNumber>
+          <CName>Tomasz Zdanowski Mikran</CName>
+          <CType>National</CType>
+          <DialNumber>613067271</DialNumber>
+          <DurationTime>9</DurationTime>
+          <Unread>1</Unread>
+          <Attempts>1</Attempts>
+        </HistoryCall>
+        </Row>
+        """
 
     def init_db(self):
         conn = sqlite3.connect(local_db)
         c = conn.cursor()
         #c.execute('DROP TABLE history_calls')
-        c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255) PRIMARY KEY, row_type var_char(32), sync_type varchar(255), hid INTEGER, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER)')        
+        c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255) PRIMARY KEY, row_type var_char(32), sync_type varchar(255), hid INTEGER, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, cnumber varchar(255), cname varchar(255))')        
         conn.commit()
 
         c.execute('SELECT marker,start_time FROM history_calls ORDER BY hid DESC')
@@ -113,14 +119,23 @@ class CallHistoryThread(QThread):
                             dial_number = 0
                             if history_call.find('DialNumber') is not None:
                                 dial_number = history_call.find('DialNumber').text
-                                
+
+                            cnumber = 0
+                            if history_call.find('CNumber') is not None:
+                                cnumber = history_call.find('CNumber').text
+
+                            cname = ''
+                            if history_call.find('CName') is not None:
+                                cname = history_call.find('CName').text
+          
                             attempts = 0
                             if history_call.find('Attempts') is not None:
                                 attempts = history_call.find('Attempts').text
 
-                            data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts)
+                            data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,cnumber,cname)
+                            print(data)
                             try:
-                                c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?)", data)
+                                c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
                                 conn.commit()
                                 print(data)
                             except sqlite3.IntegrityError as e:

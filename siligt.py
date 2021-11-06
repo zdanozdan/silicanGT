@@ -48,11 +48,6 @@ class Window(QMainWindow):
             CREATE TABLE IF NOT EXISTS config (silican_address var_char(255), silican_port INTEGER, login varchar(255), password varchar(255))
             """)
 
-        #conn = sqlite3.connect("silican.sqlite")
-        #c = conn.cursor()
-        #c.execute('SELECT * FROM history_calls')
-        #print(c.fetchall())
-
         query.exec("SELECT * FROM config")
         if query.first() == False:
             model = QSqlTableModel(self)
@@ -347,6 +342,8 @@ class CentralWidget(QWidget):
         self.model.setHeaderData(6, Qt.Horizontal, "Numer")
         self.model.setHeaderData(7, Qt.Horizontal, "Długość połączenia (s)")
         self.model.setHeaderData(8, Qt.Horizontal, "Ilość prób")
+        self.model.setHeaderData(9, Qt.Horizontal, "Numer")
+        self.model.setHeaderData(10, Qt.Horizontal, "Abonent")
         self.model.select()
         print(self.model.rowCount())
 
@@ -355,6 +352,7 @@ class CentralWidget(QWidget):
         self.tableview.hideColumn(0)
         self.tableview.hideColumn(1)
         self.tableview.hideColumn(2)
+        self.tableview.hideColumn(6)
         self.tableview.resizeColumnsToContents()
         #self.tableview.horizontalHeader().setStretchLastSection(True)
         self.tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)

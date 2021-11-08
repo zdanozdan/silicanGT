@@ -13,7 +13,6 @@ from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
 import xml.etree.ElementTree as ET
 #Thread
 from sync import CallHistoryThread
-from conf import silican_address
 #sqlite
 import sqlite3
 
@@ -58,6 +57,8 @@ class Window(QMainWindow):
             record.setValue('login', '201')
             record.setValue('password', 'mikran123')
             model.insertRecord(0, record)
+            query.exec("SELECT * FROM config")
+            query.first()
 
         index = query.record().indexOf('silican_address')
         self.silican_address = query.value(index)
@@ -133,8 +134,10 @@ class Window(QMainWindow):
         self.send_socket(message)
 
     def signal_sync_db(self,msg):
-        self.centralWidget.model.select()
         print(msg,"signal_sync_db")
+        query = QSqlQuery("select * from history_calls order by start_time desc")
+        self.centralWidget.model.setQuery(query)
+        self.centralWidget.setFilter()
 
     def signal_status(self,msg):
         if msg[0] == FRAME_EXCEPTION:
@@ -161,8 +164,6 @@ class Window(QMainWindow):
 
         tableview = QTableView()
         tableview.setModel(model)
-        tableview.resizeColumnsToContents()
-        tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         tableview.setSortingEnabled(True)
         tableview.sortByColumn(0, Qt.DescendingOrder);
 
@@ -171,8 +172,10 @@ class Window(QMainWindow):
         self.settings_widget.setLayout(vbox)        
         self.settings_widget.show()
 
-    def history(self):
-        self.thread._db_signal.emit(1)
+    def my_test(self):
+        #self.thread._db_signal.emit(1)
+        query = QSqlQuery("select * from history_calls order by start_time desc")
+        self.centralWidget.model.setQuery(query)
 
         xml_string = "<XCTIP><Calls><Change_EV><Src_Id>1001</Src_Id><Dst_Id>1001</Dst_Id><CallsState>NewCall_ST</CallsState><CR>15822</CR><Calling><Number>123123123</Number></Calling><Colp><Number>201</Number><Comment>Abonent 201</Comment></Colp><Called><Number>615555555</Number></Called></Change_EV></Calls></XCTIP>"
         
@@ -212,8 +215,8 @@ class Window(QMainWindow):
         self.toolBar.addWidget(toolButton)
 
         toolButton = QToolButton()
-        toolButton.setText("History")
-        toolButton.clicked.connect(self.history)
+        toolButton.setText("My Test")
+        toolButton.clicked.connect(self.my_test)
         self.toolBar.addWidget(toolButton)
 
         toolButton = QToolButton()
@@ -332,10 +335,55 @@ class CentralWidget(QWidget):
             )
 
         self.model = CallsQSqlTableModel(self)
-        #self.model.db = QSqlDatabase.addDatabase("QSQLITE")
-        #self.model.db.setDatabaseName("silican.sqlite")
-        self.model.setTable("history_calls")  
-        #self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
+        self.setup_model('history_calls')
+        
+        self.tableview = QTableView()
+        self.tableview.setModel(self.model)
+        self.setup_tableview()    
+
+        line_edit = QtWidgets.QLineEdit()
+        line_edit.textChanged.connect(self.filter_number)
+
+        self.all_checkbox = QtWidgets.QRadioButton("Wszystkie")
+        self.all_checkbox.toggled.connect(lambda val: self.model.setFilter(""))
+        self.all_checkbox.setChecked(True)
+        
+        self.missed_checkbox = QtWidgets.QRadioButton("Nieodebrane")
+        self.missed_checkbox.toggled.connect(self.filter_missed)
+        self.incoming_checkbox = QtWidgets.QRadioButton("Przychodzące")
+        self.incoming_checkbox.toggled.connect(self.filter_incoming)
+        self.outgoing_checkbox = QtWidgets.QRadioButton("Wychodzące")
+        self.outgoing_checkbox.toggled.connect(self.filter_outgoing)
+
+        self._filter,self._f = [],[]
+
+        self.vbox = QVBoxLayout()
+        self.vbox.addWidget(self.label)
+        self.vbox.addWidget(line_edit)
+        self.vbox.addWidget(self.all_checkbox)
+        self.vbox.addWidget(self.missed_checkbox)
+        self.vbox.addWidget(self.incoming_checkbox)
+        self.vbox.addWidget(self.outgoing_checkbox)
+        self.vbox.addWidget(self.tableview)
+        self.vbox.addWidget(self.pbar)
+        self.setLayout(self.vbox)
+        
+        self.show()
+
+    def setup_tableview(self):
+        self.tableview.hideColumn(0)
+        self.tableview.hideColumn(1)
+        self.tableview.hideColumn(2)
+        self.tableview.hideColumn(6)
+        #self.tableview.resizeColumnsToContents()
+        #self.tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.tableview.setSortingEnabled(True)
+        self.tableview.sortByColumn(4, Qt.DescendingOrder);
+
+    def setup_model(self,table):
+        self.model.setTable("history_calls")
+        #query = QSqlQuery("select * from history_calls order by start_time desc")
+        #self.model.setQuery(query)
         self.model.setHeaderData(3, Qt.Horizontal, "ID połączenia")
         self.model.setHeaderData(4, Qt.Horizontal, "Data i godzina")
         self.model.setHeaderData(5, Qt.Horizontal, "Typ")
@@ -345,47 +393,38 @@ class CentralWidget(QWidget):
         self.model.setHeaderData(9, Qt.Horizontal, "Numer")
         self.model.setHeaderData(10, Qt.Horizontal, "Abonent")
         self.model.select()
-        print(self.model.rowCount())
 
-        self.tableview = QTableView()
-        self.tableview.setModel(self.model)
-        self.tableview.hideColumn(0)
-        self.tableview.hideColumn(1)
-        self.tableview.hideColumn(2)
-        self.tableview.hideColumn(6)
-        self.tableview.resizeColumnsToContents()
-        #self.tableview.horizontalHeader().setStretchLastSection(True)
-        self.tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        #self.tableview.setMinimumWidth(25);
-        self.tableview.setSortingEnabled(True)
-        self.tableview.sortByColumn(4, Qt.DescendingOrder);
+    def _build_filter(self,f,value):
+        self._filter.append(f)        
+        if not value:
+            self._filter = list(filter((f).__ne__,self._filter))
 
-        self.model.select()
+        self.setFilter()
 
-        # filter proxy model
-        #filter_proxy_model = QtCore.QSortFilterProxyModel()
-        #filter_proxy_model.setSourceModel(self.model)
-        #filter_proxy_model.setFilterKeyColumn(6) # sixth column
+    def setFilter(self):
+        sql = " AND ".join(self._f+self._filter)
+        print(sql)
+        self.model.setFilter(" AND ".join(self._f+self._filter))
 
-        line_edit = QtWidgets.QLineEdit()
-        #line_edit.textChanged.connect(filter_proxy_model.setFilterRegExp)
+    def filter_number(self,number):
+        self._f = []
+        if number:
+            self._f = ["(cnumber like '%"+number+"%' OR cname like '%"+number+"%')",]
 
-        missed_checkbox = QtWidgets.QCheckBox("Nieodebrane")
-        incoming_checkbox = QtWidgets.QCheckBox("Przychodzące")
-        outgoing_checkbox = QtWidgets.QCheckBox("Wychodzące")
+        self.setFilter()
 
-        self.vbox = QVBoxLayout()
-        self.vbox.addWidget(self.label)
-        self.vbox.addWidget(line_edit)
-        self.vbox.addWidget(missed_checkbox)
-        self.vbox.addWidget(incoming_checkbox)
-        self.vbox.addWidget(outgoing_checkbox)
-        self.vbox.addWidget(self.tableview)
-        self.vbox.addWidget(self.pbar)
-        self.setLayout(self.vbox)
+    def filter_outgoing(self,value):
+        _s = "h_type = 'OutCall'"
+        self._build_filter(_s,value)        
+
+    def filter_incoming(self,value):
+        _s = "h_type = 'InCall'"
+        self._build_filter(_s,value)
+
+    def filter_missed(self,value):
+        _s = "h_type = 'MissedCall'"
+        self._build_filter(_s,value)
         
-        self.show()
-
     def signal_accept(self, msg):
         self.pbar.setValue(int(msg))
         if self.pbar.value() == 99:

@@ -45,7 +45,7 @@ class CallHistoryThread(QThread):
         conn = sqlite3.connect(local_db)
         c = conn.cursor()
         #c.execute('DROP TABLE history_calls')
-        c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255) PRIMARY KEY, row_type var_char(32), sync_type varchar(255), hid INTEGER, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, cnumber varchar(255), cname varchar(255))')        
+        c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, cnumber varchar(255), cname varchar(255))')        
         conn.commit()
 
         c.execute('SELECT marker,start_time FROM history_calls ORDER BY hid DESC')
@@ -54,8 +54,6 @@ class CallHistoryThread(QThread):
             self.last_marker = last[0]
         except Exception:
             self.last_marker = ''
-
-        self.last_marker = ''
 
     def __del__(self):
         self.wait()
@@ -70,7 +68,7 @@ class CallHistoryThread(QThread):
             for event, elem in self.parser.read_events():
                 if elem.tag == 'XCTIP':
                     #print("READ FRAME",elem)
-                    ET.dump(elem)
+                    #ET.dump(elem)
                     return elem
 
     def login(self):
@@ -90,12 +88,14 @@ class CallHistoryThread(QThread):
         frames = 2
         self.request_marker(self.last_marker,frames)
 
+        _cr = 0
+
         while True:
             try:
                 elem = self.read_frame()
                 error = elem.findall(".//Error")
                 if error:
-                    print(error)
+                    ET.dump(error)
                     return
                 for row in elem.findall(".//Row"):
                     marker = row.find('Marker').text
@@ -105,7 +105,6 @@ class CallHistoryThread(QThread):
 
                     if row_type == "RowEnd":
                         self._db_signal.emit(1)
-                        print("ROWEND")
                         raise Exception('ROWEND')
 
                     if row_type == 'AddRow':
@@ -133,20 +132,24 @@ class CallHistoryThread(QThread):
                                 attempts = history_call.find('Attempts').text
 
                             data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,cnumber,cname)
-                            print(data)
                             try:
                                 c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
                                 conn.commit()
                                 print(data)
                             except sqlite3.IntegrityError as e:
-                                print(str(e))
+                                print("Integrity Error"+str(e))
+                            except sqlite3.OperationalError as oe:
+                                conn.close()
+                                conn = sqlite3.connect(local_db)
+                                c = conn.cursor()
 
-                    self.last_marker = marker
-                    self.request_marker(marker,1)
+                        self.request_marker(marker,1)
+                        self.last_marker = marker
+                    #print(marker)
 
             except socket.timeout as t:
                 print(self.last_marker)
-                self.request_marker(self.last_marker,2)
+                self.request_marker(self.last_marker,1)
                 
             except Exception as e:
                 #raise

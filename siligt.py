@@ -358,7 +358,7 @@ class CentralWidget(QWidget):
         self.tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         #self.tableview.setMinimumWidth(25);
         self.tableview.setSortingEnabled(True)
-        self.tableview.sortByColumn(0, Qt.DescendingOrder);
+        self.tableview.sortByColumn(4, Qt.DescendingOrder);
 
         self.model.select()
 

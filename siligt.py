@@ -109,18 +109,18 @@ class Window(QMainWindow):
         self.thread._db_signal.connect(self.centralWidget.signal_sync_db)
         self.thread.start()
     
-        #self.socketthread = SocketThread(self.sock)
-        #self.socketthread._signal.connect(self.signal_status)        
-        #self.socketthread.start()
+        self.socketthread = SocketThread(self.sock)
+        self.socketthread._signal.connect(self.signal_status)        
+        self.socketthread.start()
 
     def start(self):
         try:
             self.connect()
             self.startButton.setEnabled(False)
-            #message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
-            #self.send_socket(message.encode('UTF-8'))
+            message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
+            self.send_socket(message.encode('UTF-8'))
             self.start_workers()
-            #self.register_calls()
+            self.register_calls()
         except Exception as e:
             QMessageBox.critical(
                 None,
@@ -129,7 +129,7 @@ class Window(QMainWindow):
             )
 
     def register_calls(self):
-        message = b'<?xml version="1.0" encoding="IBM852"?><XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
+        message = b'<XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
         self.send_socket(message)
 
     def signal_status(self,msg):
@@ -236,14 +236,17 @@ class SocketThread(QThread):
         self.parser.feed("<root>")
 
         while True:
-            data = self.sock.recv(1)
-            data = data.decode("utf-8")
-            self.parser.feed(data)
-            for event, elem in self.parser.read_events():
-                if elem.tag == 'XCTIP':
-                    #print("READ FRAME",elem)
-                    #ET.dump(elem)
-                    return elem
+            try:
+                data = self.sock.recv(1)
+                data = data.decode("utf-8")
+                self.parser.feed(data)
+                for event, elem in self.parser.read_events():
+                    if elem.tag == 'XCTIP':
+                        print("READ FRAME",elem)
+                        ET.dump(elem)
+                        return elem
+            except ET.ParseError as e:
+                pass
 
 #  <Calls>
 #    <Change_EV>
@@ -363,10 +366,10 @@ class CentralWidget(QWidget):
 
     def signal_sync_db(self,hid):
         print("signal_sync_db. Update tableview: %d" % hid)
+        self.hid = hid
         if hid > 0:
             self.latest_checkbox.setChecked(True)
 
-        self.hid = hid
         self.tableview.update()
 
     def setup_tableview(self):

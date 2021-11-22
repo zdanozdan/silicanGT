@@ -3,7 +3,7 @@
 import sys,socket,time
 from PyQt5 import QtCore
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
-from PyQt5.QtWidgets import QWidget, QPushButton, QProgressBar, QVBoxLayout, QApplication,QStatusBar,QMainWindow,QLabel,QMenuBar,QMenu,QAction,QToolBar,QToolButton,QTableView,QMessageBox,QDialog
+from PyQt5.QtWidgets import QWidget, QTabWidget, QPushButton, QProgressBar, QVBoxLayout, QFormLayout, QLineEdit, QApplication,QStatusBar,QMainWindow,QLabel,QMenuBar,QMenu,QAction,QToolBar,QToolButton,QTableView,QMessageBox,QDialog
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
 from PyQt5.QtGui import QIcon
@@ -15,6 +15,9 @@ import xml.etree.ElementTree as ET
 from sync import CallHistoryThread
 #sqlite
 import sqlite3
+from datetime import datetime
+
+from conf import local_db
 
 FRAME_SUCCESS = 0
 FRAME_EXCEPTION = 1
@@ -72,10 +75,30 @@ class Window(QMainWindow):
         index = query.record().indexOf('password')
         self.password = query.value(index)
 
+        #xml_string = "<XCTIP><Calls><Change_EV><Src_Id>1001</Src_Id><Dst_Id>1001</Dst_Id><CallsState>NewCall_ST</CallsState><CR>15822</CR><Calling><Number>123123123</Number></Calling><Colp><Number>201</Number><Comment>Abonent 201</Comment></Colp><Called><Number>615555555</Number></Called></Change_EV></Calls></XCTIP>"
+
+#        query.exec(
+#            """
+#            DROP TABLE current_calls
+#            """
+#            )
+            
+        query.exec(
+            """
+            CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255))
+            """)
+
+        #model = QSqlTableModel(self)
+        #model.setTable("current_calls")
+        #record = model.record()
+        #record.setValue('cr', '1')
+        #record.setValue('calls_state', 'new')
+        #record.setValue('calling_number', '123123123')
+        #record.setValue('called_number', '123123123')
+        #model.insertRecord(0, record)
+
         self.con.close()
         del self.con
-
-        #print(self.silican_address,self.silican_port,self.login,self.password)
 
     def connect(self):
         try:
@@ -110,7 +133,8 @@ class Window(QMainWindow):
         self.thread.start()
     
         self.socketthread = SocketThread(self.sock)
-        self.socketthread._signal.connect(self.signal_status)        
+        self.socketthread._signal.connect(self.signal_status)
+        self.socketthread._db_signal.connect(self.centralWidget.signal_sync)        
         self.socketthread.start()
 
     def start(self):
@@ -160,29 +184,8 @@ class Window(QMainWindow):
         self.settings_widget.show()
 
     def my_test(self):
-        #self.thread._db_signal.emit(1)
-        query = QSqlQuery("select * from history_calls order by start_time desc")
-        self.centralWidget.model.setQuery(query)
-
-        xml_string = "<XCTIP><Calls><Change_EV><Src_Id>1001</Src_Id><Dst_Id>1001</Dst_Id><CallsState>NewCall_ST</CallsState><CR>15822</CR><Calling><Number>123123123</Number></Calling><Colp><Number>201</Number><Comment>Abonent 201</Comment></Colp><Called><Number>615555555</Number></Called></Change_EV></Calls></XCTIP>"
-        
-        elem = ET.fromstring(xml_string)
-        #ET.dump(elem)
-
-        change = elem.findall(".//Change_EV")
-        for row in change:
-            calling = row.find(".//Calling")
-            if calling is not None:
-                calling = calling.find(".//Number")
-                print(calling.text)
-            called = row.find(".//Called")
-            if called is not None:
-                called = called.find(".//Number")
-                print(called.text)
-            calls_state = row.find(".//CallsState")
-            if calls_state is not None:
-                print(calls_state.text)
-        
+        pass
+    
     def ping(self):
         message = b'<XCTIP><Stream><WDTest></WDTest></Stream></XCTIP>'
         self.send_socket(message)
@@ -225,6 +228,7 @@ class Window(QMainWindow):
 
 class SocketThread(QThread):
     _signal = pyqtSignal(tuple)
+    _db_signal = pyqtSignal(tuple)
     def __init__(self,sock):
         super(SocketThread, self).__init__()
         self.sock = sock
@@ -270,6 +274,9 @@ class SocketThread(QThread):
 
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
+        conn = sqlite3.connect(local_db)
+        c = conn.cursor()
+        
         while True:
             try:
                 elem = self.read_frame()
@@ -279,19 +286,23 @@ class SocketThread(QThread):
                 errors = elem.findall(".//Error")
                 for error in errors:                
                     self._signal.emit((FRAME_EXCEPTION, error.text))
+
                 change = elem.findall(".//Change_EV")
                 for row in change:
-                    print(ET.tostring(row))
-                    calling = row.find(".//Calling/Number")
-                    if calling:
-                        print(calling.text)
-                    called = row.find(".//Called/Number")
-                    if called:
-                        print(called.text)
-                    calls_state = row.find(".//CallsState")
-                    if calls_state:
-                        print(calls_state.text)
+                    print(ET.dump(row))
+                    calls_state = row.find(".//CallsState").text
+                    cr = row.find(".//CR").text
 
+                    calling = 0
+                    if row.find(".//Calling/Number") is not None:
+                        calling = row.find(".//Calling/Number").text
+
+                    called = 0
+                    if row.find(".//Called/Number") is not None:
+                        called = row.find(".//Called/Number").text
+
+                    data = (cr,calls_state,calling,called)
+                    self._db_signal.emit(data)
                     self._signal.emit(ET.tostring(row).encode('UTF-8'))
                     
                 log = elem.findall(".//LogInfo_ANS")
@@ -325,7 +336,7 @@ class CentralWidget(QWidget):
             )
 
         self.model = CallsQSqlTableModel(self)
-        self.setup_model('history_calls')
+        self.setup_model(self.model,'history_calls')
         
         self.tableview = QTableView()
         self.tableview.setModel(self.model)
@@ -350,6 +361,38 @@ class CentralWidget(QWidget):
 
         self._filter,self._f = [],[]
 
+        self.tabs = QTabWidget()
+        self.tab1 = QWidget()
+        self.tab2 = QWidget()
+        self.tabs.addTab(self.tab1,"Bieżące połączenia")
+        self.tabs.addTab(self.tab2,"Historyczne")
+
+        self.current_model = CallsQSqlTableModel(self)
+        self.setup_model(self.current_model,'current_calls')
+
+        query = QSqlQuery("SELECT * FROM current_calls WHERE cr='3656'")
+        self.current_model.setQuery(query)
+        if query.first() == True:
+            record = self.current_model.record(0)
+            record.setValue("calls_state", 'zdanozdan')
+            record.setValue("start_time", datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
+            self.current_model.setRecord(0, record)
+            self.current_model.submitAll()
+
+        #query = QSqlQuery("SELECT * FROM current_calls")
+        #self.current_model.setQuery(query)
+
+        tableview_current = QTableView()
+        tableview_current.setModel(self.current_model)
+
+        layout1 = QVBoxLayout()
+        layout1.addWidget(tableview_current)
+        self.tab1.setLayout(layout1)
+
+        layout2 = QVBoxLayout()
+        layout2.addWidget(self.tableview)
+        self.tab2.setLayout(layout2)
+
         self.vbox = QVBoxLayout()
         self.vbox.addWidget(self.label)
         self.vbox.addWidget(line_edit)
@@ -358,8 +401,9 @@ class CentralWidget(QWidget):
         self.vbox.addWidget(self.incoming_checkbox)
         self.vbox.addWidget(self.outgoing_checkbox)
         self.vbox.addWidget(self.latest_checkbox)
-        self.vbox.addWidget(self.tableview)
+        self.vbox.addWidget(self.tabs)
         self.vbox.addWidget(self.pbar)
+
         self.setLayout(self.vbox)
         
         self.show()
@@ -372,6 +416,27 @@ class CentralWidget(QWidget):
 
         self.tableview.update()
 
+    def signal_sync(self,_tuple):
+        print(_tuple)
+
+        query = QSqlQuery("SELECT * FROM current_calls WHERE cr='%d'" % int(_tuple[0]))
+        self.current_model.setQuery(query)
+        if query.first() == True:
+            record = self.current_model.record(0)
+            record.setValue("calls_state", _tuple[1])
+            record.setValue("start_time", datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
+            self.current_model.setRecord(0, record)
+            self.current_model.submitAll()
+        else:
+            record = self.current_model.record()
+            record.setValue('cr', _tuple[0])
+            record.setValue('calls_state', _tuple[1])
+            record.setValue('calling_number', _tuple[2])
+            record.setValue('called_number', _tuple[3])
+            record.setValue('start_time', datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
+            self.current_model.insertRecord(-1, record)
+            self.current_model.submitAll()
+
     def setup_tableview(self):
         self.tableview.hideColumn(0)
         self.tableview.hideColumn(1)
@@ -382,19 +447,17 @@ class CentralWidget(QWidget):
         self.tableview.setSortingEnabled(True)
         self.tableview.sortByColumn(4, Qt.DescendingOrder);
 
-    def setup_model(self,table):
-        self.model.setTable("history_calls")
-        #query = QSqlQuery("select * from history_calls order by start_time desc")
-        #self.model.setQuery(query)
-        self.model.setHeaderData(3, Qt.Horizontal, "ID połączenia")
-        self.model.setHeaderData(4, Qt.Horizontal, "Data i godzina")
-        self.model.setHeaderData(5, Qt.Horizontal, "Typ")
-        self.model.setHeaderData(6, Qt.Horizontal, "Numer")
-        self.model.setHeaderData(7, Qt.Horizontal, "Długość połączenia (s)")
-        self.model.setHeaderData(8, Qt.Horizontal, "Ilość prób")
-        self.model.setHeaderData(9, Qt.Horizontal, "Numer")
-        self.model.setHeaderData(10, Qt.Horizontal, "Abonent")
-        self.model.select()
+    def setup_model(self,model,table):
+        model.setTable(table)
+        model.setHeaderData(3, Qt.Horizontal, "ID połączenia")
+        model.setHeaderData(4, Qt.Horizontal, "Data i godzina")
+        model.setHeaderData(5, Qt.Horizontal, "Typ")
+        model.setHeaderData(6, Qt.Horizontal, "Numer")
+        model.setHeaderData(7, Qt.Horizontal, "Długość połączenia (s)")
+        model.setHeaderData(8, Qt.Horizontal, "Ilość prób")
+        model.setHeaderData(9, Qt.Horizontal, "Numer")
+        model.setHeaderData(10, Qt.Horizontal, "Abonent")
+        model.select()
 
     def _build_filter(self,f,value):
         self._filter.append(f)        

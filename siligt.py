@@ -52,7 +52,7 @@ class Window(QMainWindow):
             model = QSqlTableModel(self)
             model.setTable("config")
             record = model.record()
-            record.setValue('silican_address', '192.168.0.22')
+            record.setValue('silican_address', '192.168.0.2')
             record.setValue('silican_port', '5529')
             record.setValue('login', '201')
             record.setValue('password', 'mikran123')
@@ -106,22 +106,21 @@ class Window(QMainWindow):
 
     def start_workers(self):
         self.thread = CallHistoryThread()
-        self.thread._signal.connect(self.signal_accept)
-        self.thread._db_signal.connect(self.signal_sync_db)
+        self.thread._db_signal.connect(self.centralWidget.signal_sync_db)
         self.thread.start()
     
-        self.socketthread = SocketThread(self.sock)
-        self.socketthread._signal.connect(self.signal_status)        
-        self.socketthread.start()
+        #self.socketthread = SocketThread(self.sock)
+        #self.socketthread._signal.connect(self.signal_status)        
+        #self.socketthread.start()
 
     def start(self):
         try:
             self.connect()
             self.startButton.setEnabled(False)
-            message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
-            self.send_socket(message.encode('UTF-8'))
+            #message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
+            #self.send_socket(message.encode('UTF-8'))
             self.start_workers()
-            self.register_calls()
+            #self.register_calls()
         except Exception as e:
             QMessageBox.critical(
                 None,
@@ -133,12 +132,6 @@ class Window(QMainWindow):
         message = b'<?xml version="1.0" encoding="IBM852"?><XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
         self.send_socket(message)
 
-    def signal_sync_db(self,msg):
-        print(msg,"signal_sync_db")
-        query = QSqlQuery("select * from history_calls order by start_time desc")
-        self.centralWidget.model.setQuery(query)
-        self.centralWidget.setFilter()
-
     def signal_status(self,msg):
         if msg[0] == FRAME_EXCEPTION:
             self.statusBar().setStyleSheet("color: red")
@@ -147,12 +140,6 @@ class Window(QMainWindow):
 
         self.statusBar().showMessage(msg[1])
         
-    def signal_accept(self, msg):
-        self.centralWidget.pbar.setValue(int(msg))
-        if self.centralWidget.pbar.value() == 99:
-            self.centralWidget.pbar.setValue(0)
-        #    self.btn.setEnabled(True)
-
     def settings(self):
         self.settings_widget = QDialog()
         self.settings_widget.setModal(True)
@@ -254,8 +241,8 @@ class SocketThread(QThread):
             self.parser.feed(data)
             for event, elem in self.parser.read_events():
                 if elem.tag == 'XCTIP':
-                    print("READ FRAME",elem)
-                    ET.dump(elem)
+                    #print("READ FRAME",elem)
+                    #ET.dump(elem)
                     return elem
 
 #  <Calls>
@@ -315,7 +302,7 @@ class SocketThread(QThread):
 class CentralWidget(QWidget):
     def __init__(self):
         super(CentralWidget, self).__init__()
-        self.btn = QPushButton('Click me')
+        self.hid = 0
         self.label = QLabel("GT customer: #numer, #nazwa, #NIP")
         font = self.label.font()
         font.setPointSize(30)
@@ -339,7 +326,8 @@ class CentralWidget(QWidget):
         
         self.tableview = QTableView()
         self.tableview.setModel(self.model)
-        self.setup_tableview()    
+        self.setup_tableview()
+        self.tableview.update()
 
         line_edit = QtWidgets.QLineEdit()
         line_edit.textChanged.connect(self.filter_number)
@@ -354,6 +342,8 @@ class CentralWidget(QWidget):
         self.incoming_checkbox.toggled.connect(self.filter_incoming)
         self.outgoing_checkbox = QtWidgets.QRadioButton("Wychodzące")
         self.outgoing_checkbox.toggled.connect(self.filter_outgoing)
+        self.latest_checkbox = QtWidgets.QRadioButton("Ostatnie")
+        self.latest_checkbox.toggled.connect(self.filter_latest)
 
         self._filter,self._f = [],[]
 
@@ -364,11 +354,20 @@ class CentralWidget(QWidget):
         self.vbox.addWidget(self.missed_checkbox)
         self.vbox.addWidget(self.incoming_checkbox)
         self.vbox.addWidget(self.outgoing_checkbox)
+        self.vbox.addWidget(self.latest_checkbox)
         self.vbox.addWidget(self.tableview)
         self.vbox.addWidget(self.pbar)
         self.setLayout(self.vbox)
         
         self.show()
+
+    def signal_sync_db(self,hid):
+        print("signal_sync_db. Update tableview: %d" % hid)
+        if hid > 0:
+            self.latest_checkbox.setChecked(True)
+
+        self.hid = hid
+        self.tableview.update()
 
     def setup_tableview(self):
         self.tableview.hideColumn(0)
@@ -403,7 +402,7 @@ class CentralWidget(QWidget):
 
     def setFilter(self):
         sql = " AND ".join(self._f+self._filter)
-        print(sql)
+        print("SQL: ",sql)
         self.model.setFilter(" AND ".join(self._f+self._filter))
 
     def filter_number(self,number):
@@ -415,7 +414,10 @@ class CentralWidget(QWidget):
 
     def filter_outgoing(self,value):
         _s = "h_type = 'OutCall'"
-        self._build_filter(_s,value)        
+        self._build_filter(_s,value)
+
+    def filter_latest(self,value):
+        self.model.setFilter(" hid = '%d'" % self.hid)
 
     def filter_incoming(self,value):
         _s = "h_type = 'InCall'"
@@ -425,12 +427,6 @@ class CentralWidget(QWidget):
         _s = "h_type = 'MissedCall'"
         self._build_filter(_s,value)
         
-    def signal_accept(self, msg):
-        self.pbar.setValue(int(msg))
-        if self.pbar.value() == 99:
-            self.pbar.setValue(0)
-            self.btn.setEnabled(True)
-            
 class CallsQSqlTableModel(QSqlTableModel):
    def __init__(self, dbcursor=None):
        super(CallsQSqlTableModel, self).__init__()

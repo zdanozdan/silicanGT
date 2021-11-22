@@ -2,13 +2,13 @@
 
 import sys,socket,time
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
-from conf import silican_address,silican_credentials,local_db
+from conf import silican_credentials,local_db
 import sqlite3
 
 #XML
 import xml.etree.ElementTree as ET
 
-class DoneParsing(Exception):
+class RowEndException(Exception):
     pass
 
 class CallHistoryThread(QThread):
@@ -17,8 +17,16 @@ class CallHistoryThread(QThread):
     def __init__(self):
         super(CallHistoryThread, self).__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn = sqlite3.connect(local_db)
+        c = conn.cursor()
+        c.execute('SELECT silican_address,silican_port FROM config')
+        try:
+            silican_address = c.fetchone()
+        except Exception:
+            pass
+        
         self.sock.connect(silican_address)
-        self.sock.settimeout(5)
+        #self.sock.settimeout(5)
         self.init_db()
 
         """
@@ -48,13 +56,15 @@ class CallHistoryThread(QThread):
         c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, cnumber varchar(255), cname varchar(255))')        
         conn.commit()
 
-        c.execute('SELECT marker,start_time FROM history_calls ORDER BY hid DESC')
-        try:
-            last = c.fetchone()
-            self.last_marker = last[0]
-        except Exception:
-            self.last_marker = ''
+        #c.execute('SELECT marker,start_time FROM history_calls ORDER BY hid DESC')
+        #try:
+        #    last = c.fetchone()
+        #    self.last_marker = last[0]
+        #except Exception:
+        #    self.last_marker = ''
 
+        self.last_marker = ''
+            
     def __del__(self):
         self.wait()
 
@@ -62,21 +72,28 @@ class CallHistoryThread(QThread):
         self.parser.feed("<root>")
 
         while True:
-            data = self.sock.recv(1)
-            data = data.decode("utf-8")
-            self.parser.feed(data)
-            for event, elem in self.parser.read_events():
-                if elem.tag == 'XCTIP':
-                    #print("READ FRAME",elem)
-                    #ET.dump(elem)
-                    return elem
+            try:
+                data = self.sock.recv(1)
+                data = data.decode("utf-8")
+                self.parser.feed(data)
+                for event, elem in self.parser.read_events():
+                    if elem.tag == 'XCTIP':
+                        print("READ FRAME:")
+                        ET.dump(elem)
+                        return elem
+            except ET.ParseError as e:
+                pass
 
     def login(self):
         message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % silican_credentials
         self.sock.sendall(message.encode('UTF-8'))
         
-    def request_marker(self,marker,frames):
+    def request_marker(self,marker,frames=1):
         message = '<XCTIP><Sync><Sync_REQ><CId>9</CId><Marker>%s</Marker><SyncType>HistoryCall</SyncType><Limit>%s</Limit></Sync_REQ></Sync></XCTIP>' % (marker,frames)
+        self.sock.sendall(message.encode('UTF-8'))
+
+    def register_history_request(self):
+        message = "<XCTIP><Sync><Register_REQ><CId>4</CId><SyncType>HistoryCall</SyncType></Register_REQ></Sync></XCTIP>"
         self.sock.sendall(message.encode('UTF-8'))
 
     def run(self):
@@ -85,18 +102,22 @@ class CallHistoryThread(QThread):
         c = conn.cursor()
 
         self.login()
-        frames = 2
-        self.request_marker(self.last_marker,frames)
-
-        _cr = 0
-
+        self.register_history_request()
+        self.request_marker(self.last_marker,2)
+        
         while True:
             try:
                 elem = self.read_frame()
                 error = elem.findall(".//Error")
                 if error:
-                    ET.dump(error)
+                    #ET.dump(error)
                     return
+
+                change = elem.findall(".//Change_EV")
+                if change:
+                    self.register_history_request()
+                    self.request_marker(self.last_marker)
+                
                 for row in elem.findall(".//Row"):
                     marker = row.find('Marker').text
                     row_type = row.find('RowType').text
@@ -104,8 +125,27 @@ class CallHistoryThread(QThread):
                     history_call = row.find('HistoryCall')
 
                     if row_type == "RowEnd":
-                        self._db_signal.emit(1)
-                        raise Exception('ROWEND')
+                        self._db_signal.emit(0)
+                        self.last_marker = marker
+                        raise RowEndException('ROWEND')
+
+                    if row_type == 'Update':
+                        if history_call is not None:
+                            start_time = history_call.find('StartTime').text
+                            h_id = history_call.find('HId').text
+
+                            attempts = 0
+                            if history_call.find('Attempts') is not None:
+                                attempts = history_call.find('Attempts').text
+
+                            data = (start_time,attempts,h_id)
+                            try:
+                                c.execute("UPDATE history_calls SET start_time = ?, attempts = ? WHERE hid = ?", data)
+                                conn.commit()
+                            except:
+                                raise
+
+                            self._db_signal.emit(int(h_id))
 
                     if row_type == 'AddRow':
                         if history_call is not None:
@@ -135,25 +175,19 @@ class CallHistoryThread(QThread):
                             try:
                                 c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
                                 conn.commit()
-                                print(data)
                             except sqlite3.IntegrityError as e:
-                                print("Integrity Error"+str(e))
-                            except sqlite3.OperationalError as oe:
-                                conn.close()
-                                conn = sqlite3.connect(local_db)
-                                c = conn.cursor()
+                                data = (start_time,attempts,h_id)
+                                c.execute("UPDATE history_calls SET start_time = ?, attempts = ? WHERE hid = ?", data)
+                                conn.commit()
+                            #except sqlite3.OperationalError as oe:
+                            #    conn.close()
+                            #    conn = sqlite3.connect(local_db)
+                            #    c = conn.cursor()
 
-                        self.request_marker(marker,1)
-                        self.last_marker = marker
-                    #print(marker)
+                        self.request_marker(marker)
 
-            except socket.timeout as t:
-                print(self.last_marker)
-                self.request_marker(self.last_marker,1)
-                
-            except Exception as e:
-                #raise
-                print(str(e))
+            except RowEndException:
+                pass
             
         time.sleep(0.1)
         self._signal.emit(50)

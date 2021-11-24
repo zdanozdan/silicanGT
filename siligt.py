@@ -381,7 +381,7 @@ class CentralWidget(QWidget):
         self.current_model = CallsQSqlTableModel(self)
         self.setup_current_model(self.current_model,"current_calls")
 
-        self.tableview_current = QTableView()
+        self.tableview_current = MyTableView()
         self.tableview_current.setModel(self.current_model)
         self.tableview_current.resizeColumnsToContents()
         self.tableview_current.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -536,6 +536,17 @@ class CallsQSqlTableModel(QSqlTableModel):
                return "Zakończone"
                
        return v
+   
+class MyTableView(QtWidgets.QTableView):
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Delete or event.key() == QtCore.Qt.Key_Backspace:
+            self.model().removeRow(self.currentIndex().row())
+            QMessageBox.critical(
+                None,
+                "Delete",
+                "Usunięto rekord na pozycji %d" % self.currentIndex().row(),
+            )
+        super(MyTableView, self).keyPressEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

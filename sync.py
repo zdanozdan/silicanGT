@@ -115,7 +115,7 @@ class CallHistoryThread(QThread):
 
                 change = elem.findall(".//Change_EV")
                 if change:
-                    self.register_history_request()
+                    #self.register_history_request()
                     self.request_marker(self.last_marker,2)
                 
                 for row in elem.findall(".//Row"):

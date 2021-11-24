@@ -77,11 +77,11 @@ class Window(QMainWindow):
 
         #xml_string = "<XCTIP><Calls><Change_EV><Src_Id>1001</Src_Id><Dst_Id>1001</Dst_Id><CallsState>NewCall_ST</CallsState><CR>15822</CR><Calling><Number>123123123</Number></Calling><Colp><Number>201</Number><Comment>Abonent 201</Comment></Colp><Called><Number>615555555</Number></Called></Change_EV></Calls></XCTIP>"
 
-#        query.exec(
-#            """
-#            DROP TABLE current_calls
-#            """
-#            )
+        #query.exec(
+        #    """
+        #    DELETE FROM current_calls
+        #    """
+        #    )
             
         query.exec(
             """
@@ -303,12 +303,13 @@ class SocketThread(QThread):
 
                     data = (cr,calls_state,calling,called)
                     self._db_signal.emit(data)
-                    self._signal.emit(ET.tostring(row).encode('UTF-8'))
+                    #self._signal.emit(ET.tostring(row).encode('UTF-8'))
                     
                 log = elem.findall(".//LogInfo_ANS")
                 for row in log:
                     comment = row.find('Comment').text
                     self._signal.emit((FRAME_SUCCESS,comment))
+                    
             except Exception as e:
                 self._signal.emit((FRAME_EXCEPTION,str(e)))
 
@@ -368,22 +369,18 @@ class CentralWidget(QWidget):
         self.tabs.addTab(self.tab2,"Historyczne")
 
         self.current_model = CallsQSqlTableModel(self)
-        self.setup_model(self.current_model,'current_calls')
-
-        query = QSqlQuery("SELECT * FROM current_calls WHERE cr='3656'")
-        self.current_model.setQuery(query)
-        if query.first() == True:
-            record = self.current_model.record(0)
-            record.setValue("calls_state", 'zdanozdan')
-            record.setValue("start_time", datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
-            self.current_model.setRecord(0, record)
-            self.current_model.submitAll()
-
-        #query = QSqlQuery("SELECT * FROM current_calls")
+        #query = QSqlQuery("SELECT * FROM current_calls GROUP BY cr ORDER BY start_time DESC")
         #self.current_model.setQuery(query)
+        self.current_model.setTable("current_calls")
+        self.current_model.setHeaderData(0, Qt.Horizontal, "ID połączenia")
+        self.current_model.setHeaderData(1, Qt.Horizontal, "Data i godzina")
+        self.current_model.setHeaderData(2, Qt.Horizontal, "Typ")
+        self.current_model.setHeaderData(3, Qt.Horizontal, "Numer")
+        self.current_model.select()
 
         tableview_current = QTableView()
         tableview_current.setModel(self.current_model)
+        tableview_current.sortByColumn(1, Qt.DescendingOrder);
 
         layout1 = QVBoxLayout()
         layout1.addWidget(tableview_current)
@@ -408,34 +405,64 @@ class CentralWidget(QWidget):
         
         self.show()
 
-    def signal_sync_db(self,hid):
-        print("signal_sync_db. Update tableview: %d" % hid)
-        self.hid = hid
-        if hid > 0:
-            self.latest_checkbox.setChecked(True)
+    def signal_sync_db(self,_tuple):
+        print("signal_sync_db. Update tableview: ", _tuple)
+        #self.hid = hid
+        #if hid > 0:
+        #self.latest_checkbox.setChecked(True)
 
-        self.tableview.update()
+        #self.tableview.update()
+        #('CH000000DD000000D9619779CD03E981', 'AddRow', 'HistoryCall', '217', '2021-11-22 13:41:34', 'InCall', '612222222', '290', 0, '0', '')
+        #c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time
+        #TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, cnumber varchar(255), cname varchar(255))')        
+
+        record = self.model.record()
+        record.setValue('marker', _tuple[0])
+        record.setValue('row_type', _tuple[1])
+        record.setValue('sync_type', _tuple[2])
+        record.setValue('hid', _tuple[3])
+        record.setValue('start_time', _tuple[4])
+        record.setValue('h_type', _tuple[5])
+        record.setValue('dial_number', _tuple[6])
+        record.setValue('duration_time', _tuple[7])
+        record.setValue('attempts', _tuple[8])
+        record.setValue('cnumber', _tuple[9])
+        record.setValue('cname', _tuple[10])
+        if not self.model.insertRecord(0, record):
+            print("ERROR INSERT !!!!!")
+            query = QSqlQuery("SELECT * FROM history_calls WHERE hid='%d'" % int(_tuple[3]))
+            self.model.setQuery(query)
+            if query.first() == True:
+                record = self.model.record(0)
+                record.setValue("attempts", 999)
+                self.model.setRecord(0, record)
+        #    QMessageBox.critical(
+        #        None,
+        #        "Database silican.sqlite error!",
+        #        "Database Error: %s",
+        #    )
+        self.model.submitAll()
 
     def signal_sync(self,_tuple):
         print(_tuple)
 
-        query = QSqlQuery("SELECT * FROM current_calls WHERE cr='%d'" % int(_tuple[0]))
-        self.current_model.setQuery(query)
-        if query.first() == True:
-            record = self.current_model.record(0)
-            record.setValue("calls_state", _tuple[1])
-            record.setValue("start_time", datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
-            self.current_model.setRecord(0, record)
-            self.current_model.submitAll()
-        else:
-            record = self.current_model.record()
-            record.setValue('cr', _tuple[0])
-            record.setValue('calls_state', _tuple[1])
-            record.setValue('calling_number', _tuple[2])
-            record.setValue('called_number', _tuple[3])
-            record.setValue('start_time', datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
-            self.current_model.insertRecord(-1, record)
-            self.current_model.submitAll()
+        #query = QSqlQuery("SELECT * FROM current_calls WHERE cr='%d'" % int(_tuple[0]))
+        #self.current_model.setQuery(query)
+        #if query.first() == True:
+        #    record = self.current_model.record(0)
+        ##    record.setValue("calls_state", _tuple[1])
+        #    record.setValue("start_time", datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
+        #    self.current_model.setRecord(0, record)
+        #    self.current_model.submitAll()
+        #else:
+        record = self.current_model.record()
+        record.setValue('cr', _tuple[0])
+        record.setValue('calls_state', _tuple[1])
+        record.setValue('calling_number', _tuple[2])
+        record.setValue('called_number', _tuple[3])
+        record.setValue('start_time', datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
+        self.current_model.insertRecord(0, record)
+        self.current_model.submitAll()
 
     def setup_tableview(self):
         self.tableview.hideColumn(0)

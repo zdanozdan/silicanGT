@@ -101,7 +101,6 @@ class Window(QMainWindow):
             self.sock.settimeout(3)
             self.sock.connect((self.silican_address,self.silican_port))
             self.sock.settimeout(None)
-            print((self.silican_address,self.silican_port))
             self.statusBar().setStyleSheet("color: green")
             self.statusBar().showMessage('Connected to silican on socket %s:%s' % (self.silican_address,self.silican_port))
         except socket.error as e:
@@ -288,7 +287,6 @@ class SocketThread(QThread):
 
                 change = elem.findall(".//Change_EV")
                 for row in change:
-                    print(ET.dump(row))
                     calls_state = row.find(".//CallsState").text
                     cr = row.find(".//CR").text
 
@@ -324,6 +322,12 @@ class SocketThread(QThread):
                     
             except Exception as e:
                 self._signal.emit((FRAME_EXCEPTION,str(e)))
+                QMessageBox.critical(
+                    None,
+                    "Error!",
+                    "Error: %s" % str(e),
+                )
+                
 
 
 class CentralWidget(QWidget):
@@ -393,10 +397,10 @@ class CentralWidget(QWidget):
         self.tab1.setLayout(layout1)
 
         hbox = QHBoxLayout()
-        hbox.addWidget(self.all_checkbox,0,alignment=QtCore.Qt.AlignLeft)
-        hbox.addWidget(self.missed_checkbox,0,alignment=QtCore.Qt.AlignLeft)
-        hbox.addWidget(self.incoming_checkbox,0,alignment=QtCore.Qt.AlignLeft)
-        hbox.addWidget(self.outgoing_checkbox,0,alignment=QtCore.Qt.AlignLeft)
+        hbox.addWidget(self.all_checkbox)
+        hbox.addWidget(self.missed_checkbox)
+        hbox.addWidget(self.incoming_checkbox)
+        hbox.addWidget(self.outgoing_checkbox)
 
         line = QFrame()
         line.resize(300,300)
@@ -422,9 +426,7 @@ class CentralWidget(QWidget):
         self.setup_model(self.model,'history_calls')
         self.model.select()
         self.setup_tableview()
-        print("MY TEST")
         self.label.setText("@@@@")
-        print(self.label.text())
 
     def signal_connection(self,_tuple):
         if _tuple[0] == NEW_CONNECTION:
@@ -485,7 +487,6 @@ class CentralWidget(QWidget):
 
     def setFilter(self):
         sql = " AND ".join(self._f+self._filter)
-        print("SQL: ",sql)
         self.model.setFilter(" AND ".join(self._f+self._filter))
 
     def filter_number(self,number):
@@ -494,6 +495,7 @@ class CentralWidget(QWidget):
             self._f = ["(cnumber like '%"+number+"%' OR cname like '%"+number+"%')",]
 
         self.setFilter()
+        self.current_model.setFilter("calling_number like '%"+number+"%' OR called_number like '%"+number+"%'")
 
     def filter_outgoing(self,value):
         _s = "h_type = 'OutCall'"

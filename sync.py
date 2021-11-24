@@ -116,7 +116,7 @@ class CallHistoryThread(QThread):
                 change = elem.findall(".//Change_EV")
                 if change:
                     self.register_history_request()
-                    self.request_marker(self.last_marker)
+                    self.request_marker(self.last_marker,2)
                 
                 for row in elem.findall(".//Row"):
                     marker = row.find('Marker').text
@@ -127,7 +127,7 @@ class CallHistoryThread(QThread):
                     if row_type == "RowEnd":
                         self._db_signal.emit(())
                         self.last_marker = marker
-                        raise RowEndException('ROWEND')
+                        raise RowEndException('ROWEND at marker: ',marker)
 
                     if row_type == 'Update':
                         if history_call is not None:

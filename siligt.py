@@ -3,7 +3,7 @@
 import sys,socket,time
 from PyQt5 import QtCore
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
-from PyQt5.QtWidgets import QWidget, QTabWidget, QPushButton, QProgressBar, QVBoxLayout, QFormLayout, QLineEdit, QApplication,QStatusBar,QMainWindow,QLabel,QMenuBar,QMenu,QAction,QToolBar,QToolButton,QTableView,QMessageBox,QDialog
+from PyQt5.QtWidgets import QWidget, QTabWidget, QPushButton, QProgressBar, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QApplication,QStatusBar,QMainWindow,QLabel,QMenuBar,QMenu,QAction,QToolBar,QToolButton,QTableView,QMessageBox,QDialog,QFrame
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
 from PyQt5.QtGui import QIcon
@@ -19,8 +19,8 @@ from datetime import datetime
 
 from conf import local_db
 
-FRAME_SUCCESS = 0
-FRAME_EXCEPTION = 1
+FRAME_SUCCESS,NEW_CONNECTION = 0,0
+FRAME_EXCEPTION,RELEASE_CONNECTION = 1,1
 
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -88,17 +88,12 @@ class Window(QMainWindow):
             CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255))
             """)
 
-        #model = QSqlTableModel(self)
-        #model.setTable("current_calls")
-        #record = model.record()
-        #record.setValue('cr', '1')
-        #record.setValue('calls_state', 'new')
-        #record.setValue('calling_number', '123123123')
-        #record.setValue('called_number', '123123123')
-        #model.insertRecord(0, record)
 
         self.con.close()
         del self.con
+
+        #start threads
+        self.start()
 
     def connect(self):
         try:
@@ -134,6 +129,7 @@ class Window(QMainWindow):
     
         self.socketthread = SocketThread(self.sock)
         self.socketthread._signal.connect(self.signal_status)
+        self.socketthread._signal_connection.connect(self.centralWidget.signal_connection)
         self.socketthread._db_signal.connect(self.centralWidget.signal_sync)        
         self.socketthread.start()
 
@@ -212,20 +208,26 @@ class Window(QMainWindow):
         self.toolBar.addWidget(toolButton)
 
     def createMenuBar(self):
-        pass
-        # Create new action
-        #newAction = QAction(QIcon('new.png'), '&New', self)        
-        #newAction.setShortcut('Ctrl+N')
-        #newAction.setStatusTip('New document')
-        #newAction.triggered.connect(self.newCall)
+        cleanAction = QAction(QIcon('new.png'), '&Wyczyść bieżące', self)
+        cleanAction.setShortcut('Ctrl+W')
+        cleanAction.setStatusTip('Wyczyść bieżącą historię')
+        cleanAction.triggered.connect(self.cleanAction)
         
-        #mainMenu = self.menuBar()
-        #fileMenu = mainMenu.addMenu('&File')
-        #fileMenu.addAction(newAction)
+        mainMenu = self.menuBar()
+        fileMenu = mainMenu.addMenu('&File')
+        fileMenu.addAction(cleanAction)
+
+    def cleanAction(self):
+        QMessageBox.critical(
+            None,
+            "TBD",
+            "Do zrobienia",
+        )
 
 class SocketThread(QThread):
     _signal = pyqtSignal(tuple)
     _db_signal = pyqtSignal(tuple)
+    _signal_connection = pyqtSignal(tuple)
     def __init__(self,sock):
         super(SocketThread, self).__init__()
         self.sock = sock
@@ -299,17 +301,21 @@ class SocketThread(QThread):
                         called = row.find(".//Called/Number").text
 
                     data = (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called)
-                    self._db_signal.emit(data)
-                    #self._signal.emit(ET.tostring(row).encode('UTF-8'))
 
                     #CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number 
                     try:
                         c.execute("INSERT INTO current_calls VALUES (?,?,?,?,?)", data)
                         conn.commit()
+                        self._db_signal.emit(data)
+                        self._signal.emit((FRAME_SUCCESS, "Nowe połączenie: %s" % calling))
+                        self._signal_connection.emit((NEW_CONNECTION,"%s" % calling))
                     except sqlite3.IntegrityError as e:
                         data = (calls_state,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),cr)
                         c.execute("UPDATE current_calls SET calls_state = ?, start_time = ? WHERE cr = ?", data)
                         conn.commit()
+                        self._db_signal.emit(data)
+                        self._signal.emit((FRAME_SUCCESS, "Połącznie zakończone"))
+                        self._signal_connection.emit((RELEASE_CONNECTION,'0'))
                     
                 log = elem.findall(".//LogInfo_ANS")
                 for row in log:
@@ -323,12 +329,12 @@ class SocketThread(QThread):
 class CentralWidget(QWidget):
     def __init__(self):
         super(CentralWidget, self).__init__()
-        self.hid = 0
-        self.label = QLabel("GT customer: #numer, #nazwa, #NIP")
+        self.label = QLabel("Czekam na nowe połączenie ....")
         font = self.label.font()
         font.setPointSize(30)
         self.label.setFont(font)
         self.label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.label.setStyleSheet("color: gray")
 
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
@@ -363,8 +369,6 @@ class CentralWidget(QWidget):
         self.incoming_checkbox.toggled.connect(self.filter_incoming)
         self.outgoing_checkbox = QtWidgets.QRadioButton("Wychodzące")
         self.outgoing_checkbox.toggled.connect(self.filter_outgoing)
-        self.latest_checkbox = QtWidgets.QRadioButton("Ostatnie")
-        self.latest_checkbox.toggled.connect(self.filter_latest)
 
         self._filter,self._f = [],[]
 
@@ -375,35 +379,38 @@ class CentralWidget(QWidget):
         self.tabs.addTab(self.tab2,"Historyczne")
 
         self.current_model = CallsQSqlTableModel(self)
-        #query = QSqlQuery("SELECT * FROM current_calls GROUP BY cr ORDER BY start_time DESC")
-        #self.current_model.setQuery(query)
-        self.current_model.setTable("current_calls")
-        self.current_model.setHeaderData(0, Qt.Horizontal, "ID połączenia")
-        self.current_model.setHeaderData(1, Qt.Horizontal, "Data i godzina")
-        self.current_model.setHeaderData(2, Qt.Horizontal, "Typ")
-        self.current_model.setHeaderData(3, Qt.Horizontal, "Numer")
-        self.current_model.select()
+        self.setup_current_model(self.current_model,"current_calls")
 
         self.tableview_current = QTableView()
         self.tableview_current.setModel(self.current_model)
+        self.tableview_current.resizeColumnsToContents()
+        self.tableview_current.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableview_current.sortByColumn(1, Qt.DescendingOrder);
+        self.tableview_current.setSortingEnabled(True)
 
         layout1 = QVBoxLayout()
         layout1.addWidget(self.tableview_current)
         self.tab1.setLayout(layout1)
 
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.all_checkbox,0,alignment=QtCore.Qt.AlignLeft)
+        hbox.addWidget(self.missed_checkbox,0,alignment=QtCore.Qt.AlignLeft)
+        hbox.addWidget(self.incoming_checkbox,0,alignment=QtCore.Qt.AlignLeft)
+        hbox.addWidget(self.outgoing_checkbox,0,alignment=QtCore.Qt.AlignLeft)
+
+        line = QFrame()
+        line.resize(300,300)
+        line.setStyleSheet("background-color: rgb(200, 255, 255)")
+        
         layout2 = QVBoxLayout()
+        layout2.addLayout(hbox)
         layout2.addWidget(self.tableview)
         self.tab2.setLayout(layout2)
 
         self.vbox = QVBoxLayout()
         self.vbox.addWidget(self.label)
         self.vbox.addWidget(line_edit)
-        self.vbox.addWidget(self.all_checkbox)
-        self.vbox.addWidget(self.missed_checkbox)
-        self.vbox.addWidget(self.incoming_checkbox)
-        self.vbox.addWidget(self.outgoing_checkbox)
-        self.vbox.addWidget(self.latest_checkbox)
+        #self.vbox.addLayout(hbox)
         self.vbox.addWidget(self.tabs)
         self.vbox.addWidget(self.pbar)
 
@@ -416,6 +423,17 @@ class CentralWidget(QWidget):
         self.model.select()
         self.setup_tableview()
         print("MY TEST")
+        self.label.setText("@@@@")
+        print(self.label.text())
+
+    def signal_connection(self,_tuple):
+        if _tuple[0] == NEW_CONNECTION:
+            self.label.setStyleSheet("color: green")
+            self.label.setText("Nowe połączenie: %s" % _tuple[1])
+            self._calling_number = _tuple[1]
+        else:
+            self.label.setText("Zakończono: %s" % self._calling_number)
+            self.label.setStyleSheet("color: gray")
 
     def signal_sync_db(self,_tuple):
         self.setup_model(self.model,'history_calls')
@@ -423,12 +441,7 @@ class CentralWidget(QWidget):
         self.setup_tableview()
 
     def signal_sync(self,_tuple):
-        self.current_model.setTable("current_calls")
-        self.current_model.setHeaderData(0, Qt.Horizontal, "ID połączenia")
-        self.current_model.setHeaderData(1, Qt.Horizontal, "Data i godzina")
-        self.current_model.setHeaderData(2, Qt.Horizontal, "Typ")
-        self.current_model.setHeaderData(3, Qt.Horizontal, "Numer")
-        self.current_model.select()
+        self.setup_current_model(self.current_model,"current_calls")
         self.tableview_current.setModel(self.current_model)
         self.tableview_current.sortByColumn(1, Qt.DescendingOrder);
         
@@ -437,10 +450,19 @@ class CentralWidget(QWidget):
         self.tableview.hideColumn(1)
         self.tableview.hideColumn(2)
         self.tableview.hideColumn(6)
-        #self.tableview.resizeColumnsToContents()
-        #self.tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.tableview.resizeColumnsToContents()
+        self.tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableview.setSortingEnabled(True)
         self.tableview.sortByColumn(4, Qt.DescendingOrder);
+
+    def setup_current_model(self,model,table):
+        model.setTable(table)
+        model.setHeaderData(0, Qt.Horizontal, "ID połączenia")
+        model.setHeaderData(1, Qt.Horizontal, "Data i godzina")
+        model.setHeaderData(2, Qt.Horizontal, "Typ")
+        model.setHeaderData(3, Qt.Horizontal, "Numer")
+        model.setHeaderData(4, Qt.Horizontal, "Numer wew")
+        model.select()
 
     def setup_model(self,model,table):
         model.setTable(table)
@@ -477,9 +499,6 @@ class CentralWidget(QWidget):
         _s = "h_type = 'OutCall'"
         self._build_filter(_s,value)
 
-    def filter_latest(self,value):
-        self.model.setFilter(" hid = '%d'" % self.hid)
-
     def filter_incoming(self,value):
         _s = "h_type = 'InCall'"
         self._build_filter(_s,value)
@@ -509,6 +528,12 @@ class CallsQSqlTableModel(QSqlTableModel):
            if v == 'OutCall':
                self._color = '#ff8c00'
                return "Wychodzące"
+           if v == 'NewCall_ST':
+               self._color = QtCore.Qt.green
+               return "Nowe"
+           if v == 'Release_ST':
+               #self._color = QtCore.Qt.yellow
+               return "Zakończone"
                
        return v
 

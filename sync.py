@@ -3,7 +3,10 @@
 import sys,socket,time
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
 from conf import silican_credentials,local_db
-import sqlite3
+import sqlite3,logging
+from xml.dom import minidom
+
+logging.basicConfig(filename='mikran.log', level=logging.DEBUG)
 
 #XML
 import xml.etree.ElementTree as ET
@@ -78,7 +81,7 @@ class CallHistoryThread(QThread):
                 self.parser.feed(data)
                 for event, elem in self.parser.read_events():
                     if elem.tag == 'XCTIP':
-                        print("READ FRAME:")
+                        #print("READ FRAME:")
                         ET.dump(elem)
                         return elem
             except ET.ParseError as e:
@@ -188,7 +191,5 @@ class CallHistoryThread(QThread):
                         self.request_marker(marker)
 
             except RowEndException:
-                pass
-            
-        time.sleep(0.1)
-        self._signal.emit(50)
+                self._signal.emit((0,"marker"))
+                pass        

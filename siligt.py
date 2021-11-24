@@ -182,9 +182,6 @@ class Window(QMainWindow):
         vbox.addWidget(tableview)
         self.settings_widget.setLayout(vbox)        
         self.settings_widget.show()
-
-    def my_test(self):
-        pass
     
     def ping(self):
         message = b'<XCTIP><Stream><WDTest></WDTest></Stream></XCTIP>'
@@ -206,7 +203,7 @@ class Window(QMainWindow):
 
         toolButton = QToolButton()
         toolButton.setText("My Test")
-        toolButton.clicked.connect(self.my_test)
+        toolButton.clicked.connect(self.centralWidget.my_test)
         self.toolBar.addWidget(toolButton)
 
         toolButton = QToolButton()
@@ -301,9 +298,18 @@ class SocketThread(QThread):
                     if row.find(".//Called/Number") is not None:
                         called = row.find(".//Called/Number").text
 
-                    data = (cr,calls_state,calling,called)
+                    data = (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called)
                     self._db_signal.emit(data)
                     #self._signal.emit(ET.tostring(row).encode('UTF-8'))
+
+                    #CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number 
+                    try:
+                        c.execute("INSERT INTO current_calls VALUES (?,?,?,?,?)", data)
+                        conn.commit()
+                    except sqlite3.IntegrityError as e:
+                        data = (calls_state,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),cr)
+                        c.execute("UPDATE current_calls SET calls_state = ?, start_time = ? WHERE cr = ?", data)
+                        conn.commit()
                     
                 log = elem.findall(".//LogInfo_ANS")
                 for row in log:
@@ -378,12 +384,12 @@ class CentralWidget(QWidget):
         self.current_model.setHeaderData(3, Qt.Horizontal, "Numer")
         self.current_model.select()
 
-        tableview_current = QTableView()
-        tableview_current.setModel(self.current_model)
-        tableview_current.sortByColumn(1, Qt.DescendingOrder);
+        self.tableview_current = QTableView()
+        self.tableview_current.setModel(self.current_model)
+        self.tableview_current.sortByColumn(1, Qt.DescendingOrder);
 
         layout1 = QVBoxLayout()
-        layout1.addWidget(tableview_current)
+        layout1.addWidget(self.tableview_current)
         self.tab1.setLayout(layout1)
 
         layout2 = QVBoxLayout()
@@ -405,65 +411,27 @@ class CentralWidget(QWidget):
         
         self.show()
 
+    def my_test(self):
+        self.setup_model(self.model,'history_calls')
+        self.model.select()
+        self.setup_tableview()
+        print("MY TEST")
+
     def signal_sync_db(self,_tuple):
-        print("signal_sync_db. Update tableview: ", _tuple)
-        #self.hid = hid
-        #if hid > 0:
-        #self.latest_checkbox.setChecked(True)
-
-        #self.tableview.update()
-        #('CH000000DD000000D9619779CD03E981', 'AddRow', 'HistoryCall', '217', '2021-11-22 13:41:34', 'InCall', '612222222', '290', 0, '0', '')
-        #c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time
-        #TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, cnumber varchar(255), cname varchar(255))')        
-
-        record = self.model.record()
-        record.setValue('marker', _tuple[0])
-        record.setValue('row_type', _tuple[1])
-        record.setValue('sync_type', _tuple[2])
-        record.setValue('hid', _tuple[3])
-        record.setValue('start_time', _tuple[4])
-        record.setValue('h_type', _tuple[5])
-        record.setValue('dial_number', _tuple[6])
-        record.setValue('duration_time', _tuple[7])
-        record.setValue('attempts', _tuple[8])
-        record.setValue('cnumber', _tuple[9])
-        record.setValue('cname', _tuple[10])
-        if not self.model.insertRecord(0, record):
-            print("ERROR INSERT !!!!!")
-            query = QSqlQuery("SELECT * FROM history_calls WHERE hid='%d'" % int(_tuple[3]))
-            self.model.setQuery(query)
-            if query.first() == True:
-                record = self.model.record(0)
-                record.setValue("attempts", 999)
-                self.model.setRecord(0, record)
-        #    QMessageBox.critical(
-        #        None,
-        #        "Database silican.sqlite error!",
-        #        "Database Error: %s",
-        #    )
-        self.model.submitAll()
+        self.setup_model(self.model,'history_calls')
+        self.model.select()
+        self.setup_tableview()
 
     def signal_sync(self,_tuple):
-        print(_tuple)
-
-        #query = QSqlQuery("SELECT * FROM current_calls WHERE cr='%d'" % int(_tuple[0]))
-        #self.current_model.setQuery(query)
-        #if query.first() == True:
-        #    record = self.current_model.record(0)
-        ##    record.setValue("calls_state", _tuple[1])
-        #    record.setValue("start_time", datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
-        #    self.current_model.setRecord(0, record)
-        #    self.current_model.submitAll()
-        #else:
-        record = self.current_model.record()
-        record.setValue('cr', _tuple[0])
-        record.setValue('calls_state', _tuple[1])
-        record.setValue('calling_number', _tuple[2])
-        record.setValue('called_number', _tuple[3])
-        record.setValue('start_time', datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
-        self.current_model.insertRecord(0, record)
-        self.current_model.submitAll()
-
+        self.current_model.setTable("current_calls")
+        self.current_model.setHeaderData(0, Qt.Horizontal, "ID połączenia")
+        self.current_model.setHeaderData(1, Qt.Horizontal, "Data i godzina")
+        self.current_model.setHeaderData(2, Qt.Horizontal, "Typ")
+        self.current_model.setHeaderData(3, Qt.Horizontal, "Numer")
+        self.current_model.select()
+        self.tableview_current.setModel(self.current_model)
+        self.tableview_current.sortByColumn(1, Qt.DescendingOrder);
+        
     def setup_tableview(self):
         self.tableview.hideColumn(0)
         self.tableview.hideColumn(1)

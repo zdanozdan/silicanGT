@@ -125,7 +125,7 @@ class CallHistoryThread(QThread):
                     history_call = row.find('HistoryCall')
 
                     if row_type == "RowEnd":
-                        #self._db_signal.emit(0)
+                        self._db_signal.emit(())
                         self.last_marker = marker
                         raise RowEndException('ROWEND')
 
@@ -139,11 +139,11 @@ class CallHistoryThread(QThread):
                                 attempts = history_call.find('Attempts').text
 
                             data = (start_time,attempts,h_id)
-                            #try:
-                            #    c.execute("UPDATE history_calls SET start_time = ?, attempts = ? WHERE hid = ?", data)
-                            #    conn.commit()
-                            #except:
-                            #    raise
+                            try:
+                                c.execute("UPDATE history_calls SET start_time = ?, attempts = ? WHERE hid = ?", data)
+                                conn.commit()
+                            except:
+                                raise
 
                             self._db_signal.emit(data)
 
@@ -172,15 +172,14 @@ class CallHistoryThread(QThread):
                                 attempts = history_call.find('Attempts').text
 
                             data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,cnumber,cname)
-                            self._db_signal.emit(data)
                             
-                            #try:
-                            #    c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
-                            #    conn.commit()
-                            #except sqlite3.IntegrityError as e:
-                            #    data = (start_time,attempts,h_id)
-                            #    c.execute("UPDATE history_calls SET start_time = ?, attempts = ? WHERE hid = ?", data)
-                            #    conn.commit()
+                            try:
+                                c.execute("INSERT INTO history_calls VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
+                                conn.commit()
+                            except sqlite3.IntegrityError as e:
+                                data = (start_time,attempts,h_id)
+                                c.execute("UPDATE history_calls SET start_time = ?, attempts = ? WHERE hid = ?", data)
+                                conn.commit()
                             #except sqlite3.OperationalError as oe:
                             #    conn.close()
                             #    conn = sqlite3.connect(local_db)

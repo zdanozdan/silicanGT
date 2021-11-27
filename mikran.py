@@ -37,6 +37,7 @@ class Window(QtWidgets.QMainWindow):
             return
 
         self.addModels()
+        self.addViews()
 
         vbox = QtWidgets.QVBoxLayout()
         vbox.addWidget(QtWidgets.QLabel("LABEL"))
@@ -48,9 +49,7 @@ class Window(QtWidgets.QMainWindow):
         
         self.createToolBar()        
         self.createSettingsWigdet()
-        print("S")
         self.start_threads()
-        print("STOP")
 
     def start_threads(self):
         gt_thread = gt.GTThread(parent=self)
@@ -66,8 +65,10 @@ class Window(QtWidgets.QMainWindow):
             )
 
         if data[0] == config.ODBC_SUCCESS:
-            #self.users_model.setTable("users")
-            #self.tableview_users.update()
+            self.users_model.setTable("users")
+            self.users_model.select()
+            self.statusBar().setStyleSheet("color: green")
+            self.statusBar().showMessage("Pobrano kartoteki klientów")
             QtWidgets.QMessageBox.information(
                 None,
                 "Pobrano kartotetki klientów: %s" % data[1],
@@ -77,7 +78,9 @@ class Window(QtWidgets.QMainWindow):
     def addModels(self):
         self.users_model = MikranTableModel(self)
         self.users_model.setTable("users")
+        self.users_model.select()
 
+    def addViews(self):
         self.tableview_users = QtWidgets.QTableView()
         self.tableview_users.setModel(self.users_model)
         self.tableview_users.resizeColumnsToContents()
@@ -98,7 +101,9 @@ class Window(QtWidgets.QMainWindow):
         vbox.addWidget(self.tabs)
 
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(QtWidgets.QLabel("LABEL"))
+        line_edit = QtWidgets.QLineEdit()
+        line_edit.textChanged.connect(self.filter_users)
+        layout.addWidget(line_edit)
         layout.addWidget(self.tableview_users)
         self.tab1.setLayout(layout)
         
@@ -135,10 +140,16 @@ class Window(QtWidgets.QMainWindow):
     def settings(self):        
         self.settings_widget.show()
 
+    def filter_users(self,data):
+        if data:
+            self.users_model.setFilter(" (adr_Telefon like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')")
+        else:
+            self.users_model.setFilter("")        
+
 class MikranTableModel(QtSql.QSqlTableModel):
    def __init__(self, dbcursor=None):
        super(MikranTableModel, self).__init__()
-       self._color = QtCore.Qt.gray
+       #self._color = QtCore.Qt.gray
 
 
 if __name__ == "__main__":

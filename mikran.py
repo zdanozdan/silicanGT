@@ -23,6 +23,7 @@ class Window(QtWidgets.QMainWindow):
         """Initializer."""
         super().__init__(parent)
         self.setWindowTitle("mikran.pl - integracja centrali telefonicznej")
+        self.setWindowIcon(QIcon('yoda.png')) 
         self.resize(800, 600)
         self.statusBar().showMessage('mikran.pl. Ready')
         db.init_db()

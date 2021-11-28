@@ -16,7 +16,7 @@ from sync import CallHistoryThread
 import sqlite3
 from datetime import datetime
 
-import db,gt,config
+import db,gt,config,silican
 
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
@@ -40,7 +40,31 @@ class Window(QtWidgets.QMainWindow):
         self.addViews()
 
         vbox = QtWidgets.QVBoxLayout()
-        vbox.addWidget(QtWidgets.QLabel("LABEL"))
+        self.phonenumber = QtWidgets.QLabel("Czekam na nowe połączenie ....")
+        font = self.phonenumber.font()
+        font.setPointSize(30)
+        self.phonenumber.setFont(font)
+        self.phonenumber.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.phonenumber.setStyleSheet("color: gray")
+        vbox.addWidget(self.phonenumber)
+        
+        grid = QtWidgets.QGridLayout(self)
+        
+        grid.addWidget(QtWidgets.QLabel("Firma:"),0,0)
+        self.firma = QtWidgets.QLabel("...")
+        policy = self.firma.sizePolicy()
+        policy.setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
+        self.firma.setSizePolicy(policy)
+        grid.addWidget(self.firma,0,1)
+
+        grid.addWidget(QtWidgets.QLabel("Adres:"),1,0)
+        self.adres = QtWidgets.QLabel("...")
+        grid.addWidget(self.adres,1,1)
+
+        grid.addWidget(QtWidgets.QLabel("NIP:"),2,0)
+        self.nip = QtWidgets.QLabel("...")
+        grid.addWidget(self.nip,2,1)
+        vbox.addLayout(grid)
         self.addTabs(vbox)
 
         self.widget = QtWidgets.QWidget()
@@ -51,11 +75,52 @@ class Window(QtWidgets.QMainWindow):
         self.createSettingsWigdet()
         self.start_threads()
 
+        self._calling_number = "... numer"
+
     def start_threads(self):
         gt_thread = gt.GTThread(parent=self)
         gt_thread._signal.connect(self.signal_gt)
         gt_thread.start()
 
+        silican_thread = silican.SilicanConnectionThread(parent=self)
+        silican_thread._signal.connect(self.signal_silican)
+        silican_thread.start()
+
+    def signal_silican(self,data):
+        if data[0] == config.SILICAN_CONNECTED:
+            self.statusBar().showMessage('Centrala podłączona')
+        if data[0] == config.SILICAN_ERROR:
+            self.statusBar().showMessage('Nie udało się podłączyć do centrali')
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Błąd podczas łączenia do centrali %s" % data[1],
+                "Błąd podczas łączenia do centrali %s" % data[1],
+            )
+
+        if data[0] == config.SILICAN_USER_FOUND:
+            adres = (data[1]['adr_Adres'],data[1]['adr_Miejscowosc'],data[1]['pa_Nazwa'])
+            self.firma.setText(data[1]['adr_NazwaPelna'])
+            self.firma.setStyleSheet("color: green")
+            self.adres.setText(",".join(adres))
+            self.adres.setStyleSheet("color: green")
+            self.nip.setText(data[1]['adr_NIP'])
+            self.nip.setStyleSheet("color: green")
+            
+        if data[0] == config.SILICAN_CONNECTION:
+            self.phonenumber.setStyleSheet("color: green")
+            self.phonenumber.setText("Nowe połączenie: %s" % data[1])
+            self.firma.setText("...")
+            self.adres.setText("...")
+            self.nip.setText("...")
+            self._calling_number = data[1]
+
+        if data[0] == config.SILICAN_RELEASE:
+            self.phonenumber.setText("Zakończono: %s" % self._calling_number)
+            self.phonenumber.setStyleSheet("color: gray")
+            self.firma.setStyleSheet("color: gray")
+            self.adres.setStyleSheet("color: gray")
+            self.nip.setStyleSheet("color: gray")
+        
     def signal_gt(self,data):
         if data[0] == config.ODBC_ERROR:
             QtWidgets.QMessageBox.critical(
@@ -85,7 +150,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_users.setModel(self.users_model)
         self.tableview_users.resizeColumnsToContents()
         self.tableview_users.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        self.tableview_users.sortByColumn(1, Qt.DescendingOrder);
+        self.tableview_users.sortByColumn(0, Qt.AscendingOrder);
         self.tableview_users.setSortingEnabled(True)
         self.tableview_users.setWordWrap(True);
         self.tableview_users.update()
@@ -105,7 +170,7 @@ class Window(QtWidgets.QMainWindow):
         line_edit.textChanged.connect(self.filter_users)
         layout.addWidget(line_edit)
         layout.addWidget(self.tableview_users)
-        self.tab1.setLayout(layout)
+        self.tab3.setLayout(layout)
         
     def createSettingsWigdet(self):
         self.settings_widget = QtWidgets.QDialog()

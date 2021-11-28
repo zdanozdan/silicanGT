@@ -22,7 +22,6 @@ def init_db():
     c.execute("CREATE TABLE IF NOT EXISTS users (adr_id INTEGER, adr_CountryCode varchar(10), adr_Telefon varchar(255) UNIQUE, pa_Nazwa varchar(255), adr_NazwaPelna var_char(1024), adr_NIP varchar(255), adr_Miejscowosc varchar(255), adr_Ulica varchar(255), adr_Adres varchar(1024))")
 
     #['adr_Id', 'adr_IdObiektu', 'adr_TypAdresu', 'adr_Nazwa', 'adr_NazwaPelna', 'adr_Telefon', 'adr_Faks', 'adr_Ulica', 'adr_NrDomu', 'adr_NrLokalu', 'adr_Adres', 'adr_Kod', 'adr_Miejscowosc', 'adr_IdWojewodztwo', 'adr_IdPanstwo', 'adr_NIP', 'adr_Poczta', 'adr_Gmina', 'adr_Powiat', 'adr_Skrytka', 'adr_Symbol', 'adr_IdGminy', 'adr_IdWersja', 'adr_IdZmienil', 'adr_DataZmiany']
-    
     conn.commit()
 
 def load_config():
@@ -48,7 +47,8 @@ def insert_user(user):
             c.execute("REPLACE INTO users (adr_id,adr_Telefon,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],adr_Telefon,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
             conn.commit()
         except Exception as e:
-            print(str(e))
+            pass
+        #print(str(e))
 
 def load_users():
 
@@ -59,9 +59,19 @@ def load_users():
  
     cursor.execute("SELECT * FROM adr__Ewid LEFT JOIN sl_Panstwo ON adr__Ewid.adr_idPanstwo = sl_Panstwo.pa_id WHERE adr_TypAdresu=1 ORDER BY adr_id ASC")
     columns = [col[0] for col in cursor.description]
-    print(columns)
     rows = cursor.fetchall()
     for row in rows:
         dict_row = dict(zip(columns, row))
         insert_user(dict_row)
-  
+
+def find_user(phonenumber):
+    conn = sqlite3.connect(LOCAL_DB)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE instr(adr_Telefon,'%s') > 0 OR instr('%s',adr_Telefon) > 0" % (phonenumber,phonenumber))
+    rows = c.fetchall()
+    for row in rows:
+        row = dict(zip(row.keys(), row))
+        return row
+
+    return None

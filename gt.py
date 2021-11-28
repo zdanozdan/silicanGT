@@ -7,8 +7,8 @@ class GTThread(QThread):
     def __init__(self,parent=None):
         super(GTThread, self).__init__(parent=parent)
 
-    #def __del__(self):
-        #self.wait()
+    def __del__(self):
+        self.wait()
 
     def run(self):
         try:
@@ -16,4 +16,4 @@ class GTThread(QThread):
             self._signal.emit((config.ODBC_SUCCESS,'OK'))
         except Exception as e:
             self._signal.emit((config.ODBC_ERROR,str(e)))
-            print(str(e))
+            #print(str(e))

@@ -49,11 +49,17 @@ def insert_user(user):
         adr_CountryCode = match.number.country_code
             
         try:
-            c.execute("REPLACE INTO users (adr_id,adr_Telefon,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],adr_Telefon,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
+            c.execute("INSERT INTO users (adr_id,adr_Telefon,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],adr_Telefon,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
             conn.commit()
+        except sqlite3.IntegrityError as e:
+            c.execute("UPDATE users SET adr_id = '%s',adr_CountryCode = '%s',pa_Nazwa = '%s', adr_NazwaPelna = '%s',adr_NIP = '%s',adr_Miejscowosc = '%s',adr_Ulica = '%s',adr_Adres = '%s' WHERE adr_Telefon='%s'" % (user['adr_Id'],adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres'],adr_Telefon))
+            conn.commit()            
         except Exception as e:
+            #c.execute("UPDATE users SET adr_id = '%s',adr_CountryCode = '%s',pa_Nazwa = '%s', adr_NazwaPelna = '%s',adr_NIP = '%s',adr_Miejscowosc = '%s',adr_Ulica = '%s',adr_Adres = '%s' WHERE adr_Telefon='%s'" % (user['adr_Id'],adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres'],adr_Telefon))
+            #pass
+            #conn.commit()
+            #print(str(e))
             pass
-        #print(str(e))
 
 def load_users():
 

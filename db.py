@@ -21,6 +21,11 @@ def init_db():
 
     c.execute("CREATE TABLE IF NOT EXISTS users (adr_id INTEGER, adr_CountryCode varchar(10), adr_Telefon varchar(255) UNIQUE, pa_Nazwa varchar(255), adr_NazwaPelna var_char(1024), adr_NIP varchar(255), adr_Miejscowosc varchar(255), adr_Ulica varchar(255), adr_Adres varchar(1024))")
 
+    try:
+        c.execute("CREATE UNIQUE INDEX idx_users_tel ON users (adr_Telefon)")
+    except:
+        pass
+
     #['adr_Id', 'adr_IdObiektu', 'adr_TypAdresu', 'adr_Nazwa', 'adr_NazwaPelna', 'adr_Telefon', 'adr_Faks', 'adr_Ulica', 'adr_NrDomu', 'adr_NrLokalu', 'adr_Adres', 'adr_Kod', 'adr_Miejscowosc', 'adr_IdWojewodztwo', 'adr_IdPanstwo', 'adr_NIP', 'adr_Poczta', 'adr_Gmina', 'adr_Powiat', 'adr_Skrytka', 'adr_Symbol', 'adr_IdGminy', 'adr_IdWersja', 'adr_IdZmienil', 'adr_DataZmiany']
     conn.commit()
 

@@ -72,17 +72,29 @@ class Window(QtWidgets.QMainWindow):
         self.widget.setLayout(vbox)
         self.setCentralWidget(self.widget)
         
-        self.createToolBar()        
+        self.createToolBar()
+        self.createMenuBar()
         self.createSettingsWigdet()
         self.start_threads()
 
-        self._calling_number = "... numer"
+    def createMenuBar(self):
+        usersAction = QtWidgets.QAction(QIcon('new.png'), '&Pobierz kontrahentów', self)
+        usersAction.setShortcut('Ctrl+U')
+        usersAction.setStatusTip('Wyczyść bieżącą historię')
+        usersAction.triggered.connect(self.usersActionThread)
+        
+        mainMenu = self.menuBar()
+        fileMenu = mainMenu.addMenu('&Plik')
+        fileMenu.addAction(usersAction)
 
-    def start_threads(self):
+    def usersActionThread(self):
         gt_thread = gt.GTThread(parent=self)
         gt_thread._signal.connect(self.signal_gt)
         gt_thread.start()
+        self.statusBar().setStyleSheet("color: green")
+        self.statusBar().showMessage('Pobieranie listy kontrahentów ....')        
 
+    def start_threads(self):
         silican_thread = silican.SilicanConnectionThread(parent=self)
         silican_thread._signal.connect(self.signal_silican)
         silican_thread.start()

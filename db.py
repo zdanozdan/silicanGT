@@ -39,24 +39,28 @@ def load_config():
     config = dict(zip(row.keys(), row))
     return config
 
-def insert_user(user):
+def insert_users(users):
     conn = sqlite3.connect(LOCAL_DB)
     c = conn.cursor()
-    tel_Numer = user['tel_Numer']
+
+    c.execute("DELETE FROM users")
+
+    for user in users:
+        tel_Numer = user['tel_Numer']
     
-    for match in phonenumbers.PhoneNumberMatcher(user['tel_Numer'], "PL"):
-        tel_Numer = phonenumbers.format_number(match.number, phonenumbers.PhoneNumberFormat.NATIONAL)
-        tel_Numer = "".join(tel_Numer.split())
-        adr_CountryCode = match.number.country_code
+        for match in phonenumbers.PhoneNumberMatcher(user['tel_Numer'], "PL"):
+            tel_Numer = phonenumbers.format_number(match.number, phonenumbers.PhoneNumberFormat.NATIONAL)
+            tel_Numer = "".join(tel_Numer.split())
+            adr_CountryCode = match.number.country_code
             
-        try:
-            c.execute("REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
-            conn.commit()
-        except sqlite3.IntegrityError as e:
-            pass
-        except Exception as e:
-            print(str(e))
-            pass
+            try:
+                c.execute("REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
+            except sqlite3.IntegrityError as e:
+                pass
+            except Exception as e:
+                print(str(e))
+
+    conn.commit()
 
 def load_users():
 
@@ -68,9 +72,11 @@ def load_users():
     cursor.execute("SELECT * FROM adr__Ewid LEFT JOIN sl_Panstwo ON adr__Ewid.adr_idPanstwo = sl_Panstwo.pa_id RIGHT JOIN tel__Ewid ON tel__Ewid.tel_IdAdresu = adr__Ewid.adr_Id WHERE adr__Ewid.adr_TypAdresu=1 ORDER BY adr_id ASC")
     columns = [col[0] for col in cursor.description]
     rows = cursor.fetchall()
+    dict_rows = []
     for row in rows:
-        dict_row = dict(zip(columns, row))
-        insert_user(dict_row)
+        dict_rows.append(dict(zip(columns, row)))
+
+    insert_users(dict_rows)
 
 def find_user(phonenumber):
     conn = sqlite3.connect(LOCAL_DB)

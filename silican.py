@@ -3,6 +3,8 @@ import db,config
 import time
 import xml.etree.ElementTree as ET
 import sys,socket,time
+from datetime import datetime
+import sqlite3
 
 class SilicanThreadBase(QThread):
     _signal = pyqtSignal(tuple)
@@ -32,8 +34,8 @@ class SilicanThreadBase(QThread):
         self.sock.sendall(message.encode('UTF-8'))
 
     def register_req(self):
-        message = b'<XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
-        #message = b'<XCTIP><Calls><Register_REQ><CId>1</CId></Register_REQ></Calls></XCTIP>'
+        #message = b'<XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
+        message = b'<XCTIP><Calls><Register_REQ><CId>1</CId></Register_REQ></Calls></XCTIP>'
         self.sock.sendall(message)
 
     def read_frame(self):
@@ -51,11 +53,18 @@ class SilicanThreadBase(QThread):
                         return elem
             except ET.ParseError as e:
                 pass
+            except socket.timeout as e:
+                print("Registering for Change_EV ......")
+                self.register_req()
+            except Exception as e:
+                print(str(e))
+            
 
 class SilicanConnectionThread(SilicanThreadBase):
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
         self.connect()
+        self.sock.settimeout(60)
         self.login()
         self.register_req()
 
@@ -82,7 +91,18 @@ class SilicanConnectionThread(SilicanThreadBase):
                     user = db.find_user(str(calling))
                     if user:
                         self._signal.emit((config.SILICAN_USER_FOUND,user))
+                        calling = user['tel_Numer']
+
+                    conn = sqlite3.connect("mikran.sqlite")
+                    c = conn.cursor()
+                    try:
+                        c.execute("INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called))
+                        conn.commit()
+                    except sqlite3.IntegrityError as e:
+                        #data = (calls_state,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),cr)
+                        #c.execute("UPDATE current_calls SET calls_state = ?, start_time = ? WHERE cr = ?", data)
+                        #conn.commit()
+                        raise
 
                 if calls_state == "Release_ST":
                     self._signal.emit((config.SILICAN_RELEASE,''))
-        

@@ -146,6 +146,10 @@ class Window(QtWidgets.QMainWindow):
         self.users_model.setTable("users")
         self.users_model.select()
 
+        self.calls_model = QtSql.QSqlRelationalTableModel(self)
+        self.calls_model.setQuery(QtSql.QSqlQuery("select * from current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer"))
+        self.calls_model.select()
+
     def addViews(self):
         self.tableview_users = QtWidgets.QTableView()
         self.tableview_users.setModel(self.users_model)
@@ -155,6 +159,15 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_users.setSortingEnabled(True)
         self.tableview_users.setWordWrap(True);
         self.tableview_users.update()
+
+        self.tableview_calls = QtWidgets.QTableView()
+        self.tableview_calls.setModel(self.calls_model)
+        self.tableview_calls.resizeColumnsToContents()
+        self.tableview_calls.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.tableview_calls.sortByColumn(0, Qt.AscendingOrder);
+        self.tableview_calls.setSortingEnabled(True)
+        self.tableview_calls.setWordWrap(True);
+        self.tableview_calls.update()
 
     def addTabs(self,vbox):
         self.tabs = QtWidgets.QTabWidget()
@@ -172,6 +185,13 @@ class Window(QtWidgets.QMainWindow):
         layout.addWidget(line_edit)
         layout.addWidget(self.tableview_users)
         self.tab3.setLayout(layout)
+
+        layout_calls = QtWidgets.QVBoxLayout()
+        line_edit_calls = QtWidgets.QLineEdit()
+        #line_edit.textChanged.connect(self.filter_users)
+        layout_calls.addWidget(line_edit_calls)
+        layout_calls.addWidget(self.tableview_calls)
+        self.tab1.setLayout(layout_calls)
         
     def createSettingsWigdet(self):
         self.settings_widget = QtWidgets.QDialog()
@@ -208,7 +228,7 @@ class Window(QtWidgets.QMainWindow):
 
     def filter_users(self,data):
         if data:
-            self.users_model.setFilter(" (adr_Telefon like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')")
+            self.users_model.setFilter(" (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')")
         else:
             self.users_model.setFilter("")        
 

@@ -19,14 +19,15 @@ def init_db():
     except:
         pass
 
-    c.execute("CREATE TABLE IF NOT EXISTS users (adr_id INTEGER, adr_CountryCode varchar(10), adr_Telefon varchar(255) UNIQUE, pa_Nazwa varchar(255), adr_NazwaPelna var_char(1024), adr_NIP varchar(255), adr_Miejscowosc varchar(255), adr_Ulica varchar(255), adr_Adres varchar(1024))")
+    c.execute("CREATE TABLE IF NOT EXISTS users (adr_id INTEGER, adr_CountryCode varchar(10), tel_Numer varchar(255) UNIQUE, pa_Nazwa varchar(255), adr_NazwaPelna var_char(1024), adr_NIP varchar(255), adr_Miejscowosc varchar(255), adr_Ulica varchar(255), adr_Adres varchar(1024))")
 
     try:
-        c.execute("CREATE UNIQUE INDEX idx_users_tel ON users (adr_Telefon)")
+        c.execute("CREATE UNIQUE INDEX idx_users_tel ON users (tel_Numer)")
     except:
         pass
 
-    #['adr_Id', 'adr_IdObiektu', 'adr_TypAdresu', 'adr_Nazwa', 'adr_NazwaPelna', 'adr_Telefon', 'adr_Faks', 'adr_Ulica', 'adr_NrDomu', 'adr_NrLokalu', 'adr_Adres', 'adr_Kod', 'adr_Miejscowosc', 'adr_IdWojewodztwo', 'adr_IdPanstwo', 'adr_NIP', 'adr_Poczta', 'adr_Gmina', 'adr_Powiat', 'adr_Skrytka', 'adr_Symbol', 'adr_IdGminy', 'adr_IdWersja', 'adr_IdZmienil', 'adr_DataZmiany']
+    c.execute("CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
+
     conn.commit()
 
 def load_config():
@@ -41,24 +42,20 @@ def load_config():
 def insert_user(user):
     conn = sqlite3.connect(LOCAL_DB)
     c = conn.cursor()
-    adr_Telefon = user['adr_Telefon']
+    tel_Numer = user['tel_Numer']
     
-    for match in phonenumbers.PhoneNumberMatcher(user['adr_Telefon'], "PL"):
-        adr_Telefon = phonenumbers.format_number(match.number, phonenumbers.PhoneNumberFormat.NATIONAL)
-        adr_Telefon = "".join(adr_Telefon.split())
+    for match in phonenumbers.PhoneNumberMatcher(user['tel_Numer'], "PL"):
+        tel_Numer = phonenumbers.format_number(match.number, phonenumbers.PhoneNumberFormat.NATIONAL)
+        tel_Numer = "".join(tel_Numer.split())
         adr_CountryCode = match.number.country_code
             
         try:
-            c.execute("INSERT INTO users (adr_id,adr_Telefon,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],adr_Telefon,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
+            c.execute("REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
             conn.commit()
         except sqlite3.IntegrityError as e:
-            c.execute("UPDATE users SET adr_id = '%s',adr_CountryCode = '%s',pa_Nazwa = '%s', adr_NazwaPelna = '%s',adr_NIP = '%s',adr_Miejscowosc = '%s',adr_Ulica = '%s',adr_Adres = '%s' WHERE adr_Telefon='%s'" % (user['adr_Id'],adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres'],adr_Telefon))
-            conn.commit()            
+            pass
         except Exception as e:
-            #c.execute("UPDATE users SET adr_id = '%s',adr_CountryCode = '%s',pa_Nazwa = '%s', adr_NazwaPelna = '%s',adr_NIP = '%s',adr_Miejscowosc = '%s',adr_Ulica = '%s',adr_Adres = '%s' WHERE adr_Telefon='%s'" % (user['adr_Id'],adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres'],adr_Telefon))
-            #pass
-            #conn.commit()
-            #print(str(e))
+            print(str(e))
             pass
 
 def load_users():
@@ -67,8 +64,8 @@ def load_users():
 
     cnxn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+config['server']+';DATABASE='+config['database']+';UID='+config['username']+';PWD='+ config['passwd'])
     cursor = cnxn.cursor()
- 
-    cursor.execute("SELECT * FROM adr__Ewid LEFT JOIN sl_Panstwo ON adr__Ewid.adr_idPanstwo = sl_Panstwo.pa_id WHERE adr_TypAdresu=1 ORDER BY adr_id ASC")
+
+    cursor.execute("SELECT * FROM adr__Ewid LEFT JOIN sl_Panstwo ON adr__Ewid.adr_idPanstwo = sl_Panstwo.pa_id RIGHT JOIN tel__Ewid ON tel__Ewid.tel_IdAdresu = adr__Ewid.adr_Id WHERE adr__Ewid.adr_TypAdresu=1 ORDER BY adr_id ASC")
     columns = [col[0] for col in cursor.description]
     rows = cursor.fetchall()
     for row in rows:
@@ -79,7 +76,7 @@ def find_user(phonenumber):
     conn = sqlite3.connect(LOCAL_DB)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE instr(adr_Telefon,'%s') > 0 OR instr('%s',adr_Telefon) > 0" % (phonenumber,phonenumber))
+    c.execute("SELECT * FROM users WHERE instr(tel_Numer,'%s') > 0 OR instr('%s',tel_Numer) > 0" % (phonenumber,phonenumber))
     rows = c.fetchall()
     for row in rows:
         row = dict(zip(row.keys(), row))

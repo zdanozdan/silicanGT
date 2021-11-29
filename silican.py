@@ -12,8 +12,8 @@ class SilicanThreadBase(QThread):
     def __init__(self,parent=None):
         super(SilicanThreadBase, self).__init__(parent=parent)
         
-    def __del__(self):
-        self.wait()
+    #def __del__(self):
+    #    self.wait()
 
     def connect(self):
         self.config = db.load_config()

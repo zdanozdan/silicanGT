@@ -72,20 +72,26 @@ class Window(QtWidgets.QMainWindow):
         self.widget.setLayout(vbox)
         self.setCentralWidget(self.widget)
         
-        self.createToolBar()
+        #self.createToolBar()
         self.createMenuBar()
         self.createSettingsWigdet()
         self.start_threads()
 
     def createMenuBar(self):
-        usersAction = QtWidgets.QAction(QIcon('new.png'), '&Pobierz kontrahentów', self)
-        usersAction.setShortcut('Ctrl+U')
-        usersAction.setStatusTip('Wyczyść bieżącą historię')
+        usersAction = QtWidgets.QAction(QIcon('download.png'), '&Pobierz kontrahentów', self)
+        usersAction.setShortcut('Ctrl+P')
+        usersAction.setStatusTip('Pobierz konkrahentów z baz danych')
         usersAction.triggered.connect(self.usersActionThread)
+
+        settingsAction = QtWidgets.QAction(QIcon('settings.png'), '&Ustawienia', self)
+        settingsAction.setShortcut('Ctrl+U')
+        settingsAction.setStatusTip('UStawienia')
+        settingsAction.triggered.connect(self.settings)
         
         mainMenu = self.menuBar()
         fileMenu = mainMenu.addMenu('&Plik')
         fileMenu.addAction(usersAction)
+        fileMenu.addAction(settingsAction)
 
     def usersActionThread(self):
         gt_thread = gt.GTThread(parent=self)

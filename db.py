@@ -29,6 +29,7 @@ def init_db():
     c.execute("CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
 
     conn.commit()
+    conn.close()
 
 def load_config():
     conn = sqlite3.connect(LOCAL_DB)
@@ -37,6 +38,7 @@ def load_config():
     c.execute("SELECT * FROM config WHERE config_id=0")
     row = c.fetchone()
     config = dict(zip(row.keys(), row))
+    conn.close()
     return config
 
 def insert_users(users):
@@ -44,6 +46,7 @@ def insert_users(users):
     c = conn.cursor()
 
     c.execute("DELETE FROM users")
+    conn.commit()
 
     for user in users:
         tel_Numer = user['tel_Numer']
@@ -61,9 +64,9 @@ def insert_users(users):
                 print(str(e))
 
     conn.commit()
+    conn.close()
 
 def load_users():
-
     config = load_config()
 
     cnxn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+config['server']+';DATABASE='+config['database']+';UID='+config['username']+';PWD='+ config['passwd'])
@@ -87,5 +90,7 @@ def find_user(phonenumber):
     for row in rows:
         row = dict(zip(row.keys(), row))
         return row
+
+    conn.close()
 
     return None

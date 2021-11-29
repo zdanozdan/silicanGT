@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
 import db,config
-import time
+import time,os
 import xml.etree.ElementTree as ET
 import sys,socket,time
 from datetime import datetime
@@ -61,6 +61,11 @@ class SilicanThreadBase(QThread):
             
 
 class SilicanConnectionThread(SilicanThreadBase):
+    def stop(self):
+        print("stopped")
+        self.sock.close()
+        os._exit(0)
+        
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
         self.connect()

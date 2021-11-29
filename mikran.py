@@ -165,7 +165,7 @@ class Window(QtWidgets.QMainWindow):
         self.users_model.select()
 
         self.calls_model = QtSql.QSqlRelationalTableModel(self)
-        self.calls_model.setQuery(QtSql.QSqlQuery("select * from current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer"))
+        self.calls_model.setQuery(QtSql.QSqlQuery("select * from current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
         self.calls_model.select()
 
     def addViews(self):

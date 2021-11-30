@@ -144,6 +144,10 @@ class Window(QtWidgets.QMainWindow):
             self.adres.setStyleSheet("color: gray")
             self.nip.setStyleSheet("color: gray")
 
+        if data[0] == config.SILICAN_SQL:
+            query = QtSql.QSqlQuery()
+            query.exec(data[1])
+
             #@QtCore.pyqtSlot()
     def signal_gt(self,data):
         if data[0] == config.ODBC_ERROR:

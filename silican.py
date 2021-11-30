@@ -98,16 +98,17 @@ class SilicanConnectionThread(SilicanThreadBase):
                         self._signal.emit((config.SILICAN_USER_FOUND,user))
                         calling = user['tel_Numer']
 
-                    conn = sqlite3.connect("mikran.sqlite")
-                    c = conn.cursor()
-                    try:
-                        c.execute("INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called))
-                        conn.commit()
-                    except sqlite3.IntegrityError as e:
+
+                    sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called)
+                    self._signal.emit((config.SILICAN_SQL,sql))
+                    #try:
+                    #    c.execute("INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called))
+                    #    conn.commit()
+                    #except sqlite3.IntegrityError as e:
                         #data = (calls_state,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),cr)
                         #c.execute("UPDATE current_calls SET calls_state = ?, start_time = ? WHERE cr = ?", data)
                         #conn.commit()
-                        raise
+                    #    raise
 
                 if calls_state == "Release_ST":
                     self._signal.emit((config.SILICAN_RELEASE,''))

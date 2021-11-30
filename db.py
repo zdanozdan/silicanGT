@@ -50,10 +50,6 @@ def insert_users(users,signal):
     c.execute("DELETE FROM users")
     conn.commit()
 
-    #for i in range(100):
-    #    time.sleep(0.1)
-    #    signal.emit((cfg.ODBC_INSERT,i))
-
     signal.emit((cfg.ODBC_INSERT_SETRANGE,len(users)))
     
     for idx,user in enumerate(users):
@@ -64,13 +60,15 @@ def insert_users(users,signal):
             tel_Numer = phonenumbers.format_number(match.number, phonenumbers.PhoneNumberFormat.NATIONAL)
             tel_Numer = "".join(tel_Numer.split())
             adr_CountryCode = match.number.country_code
-            
-            try:
-                c.execute("REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
-            except sqlite3.IntegrityError as e:
-                pass
-            except Exception as e:
-                print(str(e))
+
+            sql = "REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres'])
+            signal.emit((cfg.ODBC_SQL,sql))
+            #try:                
+            #    c.execute("REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
+            #except sqlite3.IntegrityError as e:
+            #    pass
+            #except Exception as e:
+            #    print(str(e))
 
     signal.emit((cfg.ODBC_INSERT,0))
     conn.commit()

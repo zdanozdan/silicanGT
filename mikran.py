@@ -28,8 +28,8 @@ class Window(QtWidgets.QMainWindow):
         self.statusBar().showMessage('mikran.pl. Ready')
         db.init_db()
         self.config = db.load_config()
-        con = db.create_con()
-        if not con.open():
+        self.con = db.create_con()
+        if not self.con.open():
             QtWidgets.QMessageBox.critical(
                 None,
                 "Database error! Sprawdź ustawienia DB",
@@ -169,14 +169,18 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.ODBC_INSERT_SETRANGE:
             self.pbar.setMaximum(int(data[1]))
 
+        if data[0] == config.ODBC_SQL:
+            query = QtSql.QSqlQuery()
+            query.exec(data[1])
+
     def addModels(self):
         self.users_model = MikranTableModel(self)
         self.users_model.setTable("users")
         self.users_model.select()
 
         self.calls_model = QtSql.QSqlRelationalTableModel(self)
-        self.calls_model.setQuery(QtSql.QSqlQuery("select start_time,calls_state,calling_number,adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC "))
-        #self.calls_model.setTable('current_calls')
+        #self.calls_model.setQuery(QtSql.QSqlQuery("SELECT start_time,calls_state,calling_number,adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+        self.calls_model.setQuery(QtSql.QSqlQuery("SELECT *FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
         self.calls_model.select()
 
     def addViews(self):

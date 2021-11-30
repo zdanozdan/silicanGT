@@ -1,6 +1,8 @@
 from PyQt5 import QtSql
 from PyQt5 import QtWidgets
 import sqlite3,pyodbc,phonenumbers
+import config as cfg
+import time
 
 LOCAL_DB = "mikran.sqlite"
 
@@ -41,14 +43,21 @@ def load_config():
     conn.close()
     return config
 
-def insert_users(users):
+def insert_users(users,signal):
     conn = sqlite3.connect(LOCAL_DB)
     c = conn.cursor()
 
     c.execute("DELETE FROM users")
     conn.commit()
 
-    for user in users:
+    #for i in range(100):
+    #    time.sleep(0.1)
+    #    signal.emit((cfg.ODBC_INSERT,i))
+
+    signal.emit((cfg.ODBC_INSERT_SETRANGE,len(users)))
+    
+    for idx,user in enumerate(users):
+        signal.emit((cfg.ODBC_INSERT,idx))
         tel_Numer = user['tel_Numer']
     
         for match in phonenumbers.PhoneNumberMatcher(user['tel_Numer'], "PL"):
@@ -63,10 +72,11 @@ def insert_users(users):
             except Exception as e:
                 print(str(e))
 
+    signal.emit((cfg.ODBC_INSERT,0))
     conn.commit()
     conn.close()
 
-def load_users():
+def load_users(signal):
     config = load_config()
 
     cnxn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+config['server']+';DATABASE='+config['database']+';UID='+config['username']+';PWD='+ config['passwd'])
@@ -79,7 +89,7 @@ def load_users():
     for row in rows:
         dict_rows.append(dict(zip(columns, row)))
 
-    insert_users(dict_rows)
+    insert_users(dict_rows,signal)
 
 def find_user(phonenumber):
     conn = sqlite3.connect(LOCAL_DB)

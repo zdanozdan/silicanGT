@@ -12,7 +12,7 @@ class GTThread(QThread):
 
     def run(self):
         try:
-            db.load_users()
+            db.load_users(self._signal)
             self._signal.emit((config.ODBC_SUCCESS,'OK'))
         except Exception as e:
             self._signal.emit((config.ODBC_ERROR,str(e)))

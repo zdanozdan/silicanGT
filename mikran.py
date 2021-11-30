@@ -68,6 +68,10 @@ class Window(QtWidgets.QMainWindow):
         vbox.addLayout(grid)
         self.addTabs(vbox)
 
+        self.pbar = QtWidgets.QProgressBar(self)
+        self.pbar.setValue(0)
+        vbox.addWidget(self.pbar)
+
         self.widget = QtWidgets.QWidget()
         self.widget.setLayout(vbox)
         self.setCentralWidget(self.widget)
@@ -159,13 +163,20 @@ class Window(QtWidgets.QMainWindow):
                 "Pobrano kartoteki klientów: %s" % data[1],
             )
 
+        if data[0] == config.ODBC_INSERT:
+            self.pbar.setValue(int(data[1]))
+
+        if data[0] == config.ODBC_INSERT_SETRANGE:
+            self.pbar.setMaximum(int(data[1]))
+
     def addModels(self):
         self.users_model = MikranTableModel(self)
         self.users_model.setTable("users")
         self.users_model.select()
 
         self.calls_model = QtSql.QSqlRelationalTableModel(self)
-        self.calls_model.setQuery(QtSql.QSqlQuery("select * from current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+        self.calls_model.setQuery(QtSql.QSqlQuery("select start_time,calls_state,calling_number,adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC "))
+        #self.calls_model.setTable('current_calls')
         self.calls_model.select()
 
     def addViews(self):
@@ -193,7 +204,7 @@ class Window(QtWidgets.QMainWindow):
         self.tab2 = QtWidgets.QWidget()
         self.tab3 = QtWidgets.QWidget()
         self.tabs.addTab(self.tab1,"Bieżące połączenia")
-        self.tabs.addTab(self.tab2,"Historyczne")
+        #self.tabs.addTab(self.tab2,"Historyczne")
         self.tabs.addTab(self.tab3,"Kontakty")
         vbox.addWidget(self.tabs)
 

@@ -89,6 +89,7 @@ def load_users(signal):
     for row in rows:
         dict_rows.append(dict(zip(columns, row)))
 
+    cnxn.close()
     insert_users(dict_rows,signal)
 
 def find_user(phonenumber):

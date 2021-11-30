@@ -47,8 +47,8 @@ def insert_users(users,signal):
     conn = sqlite3.connect(LOCAL_DB)
     c = conn.cursor()
 
-    c.execute("DELETE FROM users")
-    conn.commit()
+    #c.execute("DELETE FROM users")
+    #conn.commit()
 
     signal.emit((cfg.ODBC_INSERT_SETRANGE,len(users)))
     

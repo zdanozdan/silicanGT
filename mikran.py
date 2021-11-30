@@ -143,7 +143,8 @@ class Window(QtWidgets.QMainWindow):
             self.firma.setStyleSheet("color: gray")
             self.adres.setStyleSheet("color: gray")
             self.nip.setStyleSheet("color: gray")
-        
+
+            #@QtCore.pyqtSlot()
     def signal_gt(self,data):
         if data[0] == config.ODBC_ERROR:
             QtWidgets.QMessageBox.critical(

@@ -16,8 +16,6 @@ from datetime import datetime
 
 import db,gt,config,silican,slack
 
-MESSAGE_COLS = ("start_time","tel_Numer","pa_Nazwa","adr_NazwaPelna","adr_NIP","adr_Miejscowosc","adr_Ulica")
-
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         """Initializer."""
@@ -29,6 +27,7 @@ class Window(QtWidgets.QMainWindow):
         self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
+        db.load_slack_users()
         self.con = db.create_con()
         if not self.con.open():
             QtWidgets.QMessageBox.critical(
@@ -305,26 +304,32 @@ class CustomerDialog(QtWidgets.QDialog):
         layout = QtWidgets.QFormLayout()
         self.textbox = QtWidgets.QPlainTextEdit(self)
 
-        m = (self.message['start_time'],'Tel: '+self.message['tel_Numer'],self.message['adr_NazwaPelna'],'NIP: '+self.message['adr_NIP'],self.message['adr_Miejscowosc'],self.message['adr_Ulica'])        
+        m = (self.message['start_time'],'Tel: '+self.message['calling_number'],self.message['adr_NazwaPelna'],'NIP: '+self.message['adr_NIP'],self.message['adr_Miejscowosc'],self.message['adr_Ulica'])        
         self.textbox.setPlainText("\r\n".join(m))
         
         layout.addRow(QtWidgets.QLabel("Wiadomość:"), self.textbox)
         users = slack.get_members()
         self.cb = QtWidgets.QComboBox()
         self.cb.addItem('')
-        self.cb.addItems(users)
+        slack_users = db.slack_users_list()
+        for user in slack_users:
+            self.cb.addItem(user[1],user[0])
         layout.addRow(QtWidgets.QLabel("Pobudka:"), self.cb)
         layout.addRow(QtWidgets.QLabel("Kanał:"), QtWidgets.QLabel("#mikran_ogolnie"))
         self.formGroupBox.setLayout(layout)
 
     def slackit(self):
         message = self.textbox.toPlainText()
-        mention = self.cb.itemText(self.cb.currentIndex())
+        mention = self.cb.itemData(self.cb.currentIndex())
         if mention:
             message = message + "\r\n" + "<@"+mention+">"
 
-        print (message.strip())
-        slack.send_message(message)
+        slack.send_message(message.strip())
+        QtWidgets.QMessageBox.critical(
+            None,
+            "Wysłano",
+            "Poleciało w kanał",
+        )
 
 class MikranTableModel(QtSql.QSqlTableModel):
    def __init__(self, dbcursor=None):
@@ -343,8 +348,7 @@ class CallsTableView(QtWidgets.QTableView):
 
         print(dict(selected))
         dlg = CustomerDialog(dict(selected))
-        if dlg.exec():
-            print("OK")
+        dlg.exec()
             
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Enter:

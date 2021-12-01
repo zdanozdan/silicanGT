@@ -2,6 +2,7 @@ from PyQt5 import QtSql
 from PyQt5 import QtWidgets
 import sqlite3,pyodbc,phonenumbers
 import config as cfg
+import slack
 import time
 
 LOCAL_DB = "mikran.sqlite"
@@ -21,6 +22,12 @@ def init_db():
     except:
         pass
 
+    #try:
+    #c.execute("DROP TABLE slack_users")
+    c.execute("CREATE TABLE IF NOT EXISTS slack_users (userid varchar(255) UNIQUE, username varchar(255))")
+    #except:
+    #    pass
+
     c.execute("CREATE TABLE IF NOT EXISTS users (adr_id INTEGER, adr_CountryCode varchar(10), tel_Numer varchar(255) UNIQUE, pa_Nazwa varchar(255), adr_NazwaPelna var_char(1024), adr_NIP varchar(255), adr_Miejscowosc varchar(255), adr_Ulica varchar(255), adr_Adres varchar(1024))")
 
     try:
@@ -32,6 +39,25 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+def load_slack_users():
+    conn = sqlite3.connect(LOCAL_DB)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    users = slack.get_members()
+    for user in users:
+        c.execute("REPLACE INTO slack_users (username,userid) values('%s','%s')" % user)
+    conn.commit()
+    conn.close()
+    return users
+
+def slack_users_list():
+    conn = sqlite3.connect(LOCAL_DB)
+    c = conn.cursor()
+    c.execute("SELECT * FROM slack_users")
+    rows = c.fetchall()
+    conn.close()
+    return rows    
 
 def load_config():
     conn = sqlite3.connect(LOCAL_DB)

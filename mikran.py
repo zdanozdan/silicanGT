@@ -10,13 +10,13 @@ from PyQt5 import QtSql
 
 #XML
 import xml.etree.ElementTree as ET
-#Thread
-from sync import CallHistoryThread
 #sqlite
 import sqlite3
 from datetime import datetime
 
-import db,gt,config,silican
+import db,gt,config,silican,slack
+
+MESSAGE_COLS = ("start_time","tel_Numer","pa_Nazwa","adr_NazwaPelna","adr_NIP","adr_Miejscowosc","adr_Ulica")
 
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
@@ -26,6 +26,7 @@ class Window(QtWidgets.QMainWindow):
         self.setWindowIcon(QIcon('yoda.png')) 
         self.resize(800, 600)
         self.statusBar().showMessage('mikran.pl. Ready')
+        self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
         self.con = db.create_con()
@@ -190,6 +191,8 @@ class Window(QtWidgets.QMainWindow):
 
     def addViews(self):
         self.tableview_users = QtWidgets.QTableView()
+        self.tableview_users.setAlternatingRowColors(True);
+        #self.tableview_users.setStyleSheet("alternate-background-color: yellow;background-color: red;");
         self.tableview_users.setModel(self.users_model)
         self.tableview_users.resizeColumnsToContents()
         self.tableview_users.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
@@ -198,7 +201,8 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_users.setWordWrap(True);
         self.tableview_users.update()
 
-        self.tableview_calls = QtWidgets.QTableView()
+        self.tableview_calls = CallsTableView()
+        self.tableview_calls.setAlternatingRowColors(True);
         self.tableview_calls.setModel(self.calls_model)
         self.tableview_calls.resizeColumnsToContents()
         self.tableview_calls.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
@@ -268,12 +272,91 @@ class Window(QtWidgets.QMainWindow):
         if data:
             self.users_model.setFilter(" (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')")
         else:
-            self.users_model.setFilter("")        
+            self.users_model.setFilter("")
+
+
+class CustomerDialog(QtWidgets.QDialog):
+    def __init__(self,message=tuple()):
+        super().__init__()
+        self.message = message
+        self.setWindowTitle("Wysyłka na Slack'a")
+        self.createFormGroupBox()
+        #QBtn = QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Ignore
+
+        button = QtWidgets.QPushButton("Slack it !")
+        button.clicked.connect(self.slackit)
+        
+        self.buttonBox = QtWidgets.QDialogButtonBox()
+        #self.buttonBox.addButton(QBtn)
+        self.buttonBox.addButton(button,QtWidgets.QDialogButtonBox.AcceptRole)
+        self.buttonBox.addButton("Zamknij",QtWidgets.QDialogButtonBox.RejectRole)
+        #self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        self.layout = QtWidgets.QVBoxLayout()
+        #message = QtWidgets.QLabel("Tekst do wysłania:")
+        #self.layout.addWidget(message)
+        self.layout.addWidget(self.formGroupBox)
+        self.layout.addWidget(self.buttonBox)
+        self.setLayout(self.layout)
+
+    def createFormGroupBox(self):
+        self.formGroupBox = QtWidgets.QGroupBox("Wysyłka na kanał slackowy. Żeby dodać powiadomienie <@username>")
+        layout = QtWidgets.QFormLayout()
+        self.textbox = QtWidgets.QPlainTextEdit(self)
+
+        m = (self.message['start_time'],'Tel: '+self.message['tel_Numer'],self.message['adr_NazwaPelna'],'NIP: '+self.message['adr_NIP'],self.message['adr_Miejscowosc'],self.message['adr_Ulica'])        
+        self.textbox.setPlainText("\r\n".join(m))
+        
+        layout.addRow(QtWidgets.QLabel("Wiadomość:"), self.textbox)
+        users = slack.get_members()
+        self.cb = QtWidgets.QComboBox()
+        self.cb.addItem('')
+        self.cb.addItems(users)
+        layout.addRow(QtWidgets.QLabel("Pobudka:"), self.cb)
+        layout.addRow(QtWidgets.QLabel("Kanał:"), QtWidgets.QLabel("#mikran_ogolnie"))
+        self.formGroupBox.setLayout(layout)
+
+    def slackit(self):
+        message = self.textbox.toPlainText()
+        mention = self.cb.itemText(self.cb.currentIndex())
+        if mention:
+            message = message + "\r\n" + "<@"+mention+">"
+
+        print (message.strip())
+        slack.send_message(message)
 
 class MikranTableModel(QtSql.QSqlTableModel):
    def __init__(self, dbcursor=None):
        super(MikranTableModel, self).__init__()
        #self._color = QtCore.Qt.gray
+       
+class CallsTableView(QtWidgets.QTableView):
+    def mouseDoubleClickEvent(self, event):
+        current_row = self.currentIndex().row()
+        selected = []
+        
+        for i in range(self.model().columnCount()):
+            col = self.model().headerData(i,Qt.Horizontal)
+            index = self.model().index(current_row,i)
+            selected.append((col,self.model().data(index)))
+
+        print(dict(selected))
+        dlg = CustomerDialog(dict(selected))
+        if dlg.exec():
+            print("OK")
+            
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Enter:
+            print("ENTER")
+        if event.key() == QtCore.Qt.Key_Delete or event.key() == QtCore.Qt.Key_Backspace:
+            #self.model().removeRow(self.currentIndex().row())
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Delete",
+                "Usunięto rekord na pozycji %d" % self.currentIndex().row(),
+            )
+        super(CallsTableView, self).keyPressEvent(event)
 
 
 if __name__ == "__main__":

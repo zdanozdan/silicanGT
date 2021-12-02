@@ -144,6 +144,7 @@ class Window(QtWidgets.QMainWindow):
             self.adres.setText("...")
             self.nip.setText("...")
             self._calling_number = data[1]
+            self.statusBar().showMessage('Połączenie od: %s ' % data[1])
 
         if data[0] == config.SILICAN_RELEASE:
             self.phonenumber.setText("Zakończono: %s" % self._calling_number)
@@ -155,6 +156,8 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.SILICAN_SQL:
             query = QtSql.QSqlQuery()
             query.exec(data[1])
+            self.calls_model.setQuery(QtSql.QSqlQuery("SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+            self.calls_model.select()
 
             #@QtCore.pyqtSlot()
     def signal_gt(self,data):
@@ -192,8 +195,10 @@ class Window(QtWidgets.QMainWindow):
         self.users_model.select()
 
         self.calls_model = QtSql.QSqlRelationalTableModel(self)
+        #self.calls_model.setTable("current_calls")
+        #self.calls_model.setRelation(self.calls_model.fieldIndex("calling_number"), QtSql.QSqlRelation("users", "tel_Numer2", "adr_NazwaPelna"));
         #self.calls_model.setQuery(QtSql.QSqlQuery("SELECT start_time,calls_state,calling_number,adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
-        self.calls_model.setQuery(QtSql.QSqlQuery("SELECT *FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+        self.calls_model.setQuery(QtSql.QSqlQuery("SELECT start_time as Godzina, calls_state as Stan, calling_number as Numer_tel, called_number as Linia_tel,adr_NazwaPelna as Adres, adr_NIP as NIP, adr_Miejscowosc as Miejscowosc, adr_Ulica as Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
         self.calls_model.select()
 
     def addViews(self):
@@ -211,6 +216,11 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_calls = CallsTableView()
         self.tableview_calls.setAlternatingRowColors(True);
         self.tableview_calls.setModel(self.calls_model)
+        #self.tableview_calls.hideColumn(0)
+        #self.tableview_calls.hideColumn(3)
+        #self.tableview_calls.hideColumn(5)
+        #self.tableview_calls.hideColumn(6)
+        #self.tableview_calls.hideColumn(13)
         self.tableview_calls.resizeColumnsToContents()
         self.tableview_calls.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.tableview_calls.sortByColumn(0, Qt.AscendingOrder);

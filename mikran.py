@@ -16,6 +16,8 @@ from datetime import datetime
 
 import db,gt,config,silican,slack
 
+Q1 = "SELECT start_time as Godzina, calls_state as Stan, calling_number as Numer_tel, called_number as Linia_tel,adr_NazwaPelna as Adres, adr_NIP as NIP, adr_Miejscowosc as Miejscowosc, adr_Ulica as Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         """Initializer."""
@@ -156,7 +158,7 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.SILICAN_SQL:
             query = QtSql.QSqlQuery()
             query.exec(data[1])
-            self.calls_model.setQuery(QtSql.QSqlQuery("SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+            self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
             self.calls_model.select()
 
             #@QtCore.pyqtSlot()
@@ -195,10 +197,7 @@ class Window(QtWidgets.QMainWindow):
         self.users_model.select()
 
         self.calls_model = QtSql.QSqlRelationalTableModel(self)
-        #self.calls_model.setTable("current_calls")
-        #self.calls_model.setRelation(self.calls_model.fieldIndex("calling_number"), QtSql.QSqlRelation("users", "tel_Numer2", "adr_NazwaPelna"));
-        #self.calls_model.setQuery(QtSql.QSqlQuery("SELECT start_time,calls_state,calling_number,adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
-        self.calls_model.setQuery(QtSql.QSqlQuery("SELECT start_time as Godzina, calls_state as Stan, calling_number as Numer_tel, called_number as Linia_tel,adr_NazwaPelna as Adres, adr_NIP as NIP, adr_Miejscowosc as Miejscowosc, adr_Ulica as Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+        self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
         self.calls_model.select()
 
     def addViews(self):

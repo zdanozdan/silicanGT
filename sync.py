@@ -8,6 +8,8 @@ from xml.dom import minidom
 
 logging.basicConfig(filename='mikran.log', level=logging.DEBUG)
 
+from datetime import datetime
+
 #XML
 import xml.etree.ElementTree as ET
 
@@ -29,7 +31,7 @@ class CallHistoryThread(QThread):
             pass
         
         self.sock.connect(silican_address)
-        #self.sock.settimeout(5)
+        self.sock.settimeout(30)
         self.init_db()
 
         """
@@ -86,6 +88,11 @@ class CallHistoryThread(QThread):
                         return elem
             except ET.ParseError as e:
                 pass
+            except socket.timeout:
+                self.register_history_request()
+                print(datetime.now())
+                print("HISTORY REQ")
+                pass
 
     def login(self):
         message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % silican_credentials
@@ -93,6 +100,10 @@ class CallHistoryThread(QThread):
         
     def request_marker(self,marker,frames=1):
         message = '<XCTIP><Sync><Sync_REQ><CId>9</CId><Marker>%s</Marker><SyncType>HistoryCall</SyncType><Limit>%s</Limit></Sync_REQ></Sync></XCTIP>' % (marker,frames)
+        self.sock.sendall(message.encode('UTF-8'))
+
+    def request_book_marker(self,marker,frames=1):
+        message = '<XCTIP><Sync><Sync_REQ><CId>9</CId><Marker>%s</Marker><SyncType>Book</SyncType><Limit>%s</Limit></Sync_REQ></Sync></XCTIP>' % (marker,frames)
         self.sock.sendall(message.encode('UTF-8'))
 
     def register_history_request(self):
@@ -107,6 +118,7 @@ class CallHistoryThread(QThread):
         self.login()
         self.register_history_request()
         self.request_marker(self.last_marker,2)
+        #self.request_book_marker(self.last_marker,2)
         
         while True:
             try:

@@ -15,16 +15,17 @@ def create_con():
 def init_db():
     conn = sqlite3.connect(LOCAL_DB)
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS config (config_id INTEGER PRIMARY KEY, silican_address var_char(255), silican_port INTEGER, login var_char(255), password var_char(255), server var_char(255), database var_char(255), username var_char(255), passwd varchar(255))")
-    data = (0,'192.168.0.2','5529','201','mikran123','192.168.0.140','MIKRAN','mikran_com','mikran_comqwer4321')
+    c.execute("CREATE TABLE IF NOT EXISTS config (config_id INTEGER PRIMARY KEY, silican_address var_char(255), silican_port INTEGER, login var_char(255), password var_char(255), server var_char(255), database var_char(255), username var_char(255), passwd varchar(255), slack_token varchar(255), slack_url varchar(255))")
+    data = (0,'192.168.0.2','5529','201','mikran123','192.168.0.140','MIKRAN','mikran_com','mikran_comqwer4321','','')
     try:
-        c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?)", data)
+        c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
     except:
         pass
 
     #try:
     #c.execute("DROP TABLE slack_users")
     c.execute("CREATE TABLE IF NOT EXISTS slack_users (userid varchar(255) UNIQUE, username varchar(255))")
+    c.execute("DELETE FROM slack_users")
     #except:
     #    pass
 

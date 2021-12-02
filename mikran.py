@@ -27,7 +27,15 @@ class Window(QtWidgets.QMainWindow):
         self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
-        db.load_slack_users()
+        try:
+            db.load_slack_users()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Slack error",
+                "SlackError: %s" % str(e),
+            )
+            
         self.con = db.create_con()
         if not self.con.open():
             QtWidgets.QMessageBox.critical(
@@ -308,7 +316,6 @@ class CustomerDialog(QtWidgets.QDialog):
         self.textbox.setPlainText("\r\n".join(m))
         
         layout.addRow(QtWidgets.QLabel("Wiadomość:"), self.textbox)
-        users = slack.get_members()
         self.cb = QtWidgets.QComboBox()
         self.cb.addItem('')
         slack_users = db.slack_users_list()

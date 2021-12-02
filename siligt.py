@@ -13,6 +13,7 @@ from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
 import xml.etree.ElementTree as ET
 #Thread
 from sync import CallHistoryThread
+from subiekt import SubiektThread
 #sqlite
 import sqlite3
 from datetime import datetime
@@ -85,22 +86,20 @@ class Window(QMainWindow):
             
         query.exec(
             """
-            CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255))
+            CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), rel_cause var_char(255), calling_number varchar(255), called_number varchar(255))
             """)
 
 
         self.con.close()
         del self.con
 
-        #start threads
         self.start()
 
     def connect(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(3)
+            self.sock.settimeout(10)
             self.sock.connect((self.silican_address,self.silican_port))
-            self.sock.settimeout(None)
             self.statusBar().setStyleSheet("color: green")
             self.statusBar().showMessage('Connected to silican on socket %s:%s' % (self.silican_address,self.silican_port))
         except socket.error as e:
@@ -114,19 +113,17 @@ class Window(QMainWindow):
             )
             raise
 
-    def send_socket(self,msg):
-        try:
-            self.sock.sendall(msg)
-        except Exception as e:
-            self.statusBar().setStyleSheet("color: red")
-            self.statusBar().showMessage(str(e))
-
     def start_workers(self):
+
+        subiekt = SubiektThread()
+        subiekt.start()
+        #return
+        
         self.thread = CallHistoryThread()
         self.thread._db_signal.connect(self.centralWidget.signal_sync_db)
         self.thread.start()
     
-        self.socketthread = SocketThread(self.sock)
+        self.socketthread = SocketThread(self.sock,self.login,self.password)
         self.socketthread._signal.connect(self.signal_status)
         self.socketthread._signal_connection.connect(self.centralWidget.signal_connection)
         self.socketthread._db_signal.connect(self.centralWidget.signal_sync)        
@@ -136,20 +133,13 @@ class Window(QMainWindow):
         try:
             self.connect()
             self.startButton.setEnabled(False)
-            message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
-            self.send_socket(message.encode('UTF-8'))
             self.start_workers()
-            self.register_calls()
         except Exception as e:
             QMessageBox.critical(
                 None,
                 "Socket Error, check silican configuration",
                 "Connection Error: (%s)" % str(e),
             )
-
-    def register_calls(self):
-        message = b'<XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
-        self.send_socket(message)
 
     def signal_status(self,msg):
         if msg[0] == FRAME_EXCEPTION:
@@ -180,7 +170,7 @@ class Window(QMainWindow):
     
     def ping(self):
         message = b'<XCTIP><Stream><WDTest></WDTest></Stream></XCTIP>'
-        self.send_socket(message)
+        self.sock.sendall(message)
 
     def createToolBar(self):
         self.toolBar = QToolBar("My main toolbar")
@@ -196,10 +186,10 @@ class Window(QMainWindow):
         toolButton.clicked.connect(self.ping)
         self.toolBar.addWidget(toolButton)
 
-        toolButton = QToolButton()
-        toolButton.setText("My Test")
-        toolButton.clicked.connect(self.centralWidget.my_test)
-        self.toolBar.addWidget(toolButton)
+        #toolButton = QToolButton()
+        #toolButton.setText("My Test")
+        #toolButton.clicked.connect(self.centralWidget.my_test)
+        #self.toolBar.addWidget(toolButton)
 
         toolButton = QToolButton()
         toolButton.setText("Settings")
@@ -227,12 +217,15 @@ class SocketThread(QThread):
     _signal = pyqtSignal(tuple)
     _db_signal = pyqtSignal(tuple)
     _signal_connection = pyqtSignal(tuple)
-    def __init__(self,sock):
+    def __init__(self,sock,login,password):
         super(SocketThread, self).__init__()
         self.sock = sock
+        self.login = login
+        self.password = password
 
-        #def __del__(self):
-        #self.wait()
+    def __del__(self):
+        self.wait()
+
 
     def read_frame(self):
         self.parser.feed("<root>")
@@ -244,11 +237,18 @@ class SocketThread(QThread):
                 self.parser.feed(data)
                 for event, elem in self.parser.read_events():
                     if elem.tag == 'XCTIP':
-                        print("READ FRAME",elem)
+                        #print("READ FRAME",elem)
                         ET.dump(elem)
+                        print(datetime.now())
                         return elem
             except ET.ParseError as e:
                 pass
+            except socket.timeout:
+                print("Timeout on socket")
+                message = b'<XCTIP><Calls><Register_REQ><CId>1</CId></Register_REQ></Calls></XCTIP>'
+                self.sock.sendall(message)
+            #message = b'<XCTIP><Stream><WDTest></WDTest></Stream></XCTIP>'
+            #    self.sock.sendall(message)
 
 #  <Calls>
 #    <Change_EV>
@@ -266,6 +266,7 @@ class SocketThread(QThread):
 #      <Dst_Id>1001</Dst_Id>
 #      <CallsState>Release_ST</CallsState>
 #      <CR>15822</CR>
+#      <RelCause>call_intercepted</RelCause>
 #    </Change_EV>
 #  </Calls>
 #</XCTIP>
@@ -274,6 +275,13 @@ class SocketThread(QThread):
         self.parser = ET.XMLPullParser(['end'])
         conn = sqlite3.connect(local_db)
         c = conn.cursor()
+
+        message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.login,self.password)
+        self.sock.sendall(message.encode('UTF-8'))
+
+        #message = b'<XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
+        message = b'<XCTIP><Calls><Register_REQ><CId>1</CId></Register_REQ></Calls></XCTIP>'
+        self.sock.sendall(message)
         
         while True:
             try:
@@ -298,22 +306,32 @@ class SocketThread(QThread):
                     if row.find(".//Called/Number") is not None:
                         called = row.find(".//Called/Number").text
 
-                    data = (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called)
+                    rel_cause = ""
+                    if row.find(".//RelCause") is not None:
+                        rel_cause  = row.find(".//RelCause").text
 
-                    #CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number 
+                    now = datetime.now().strftime("%m-%d-%Y, %H:%M:%S")
+                    data = (cr,now,calls_state,rel_cause,calling,called)
+
                     try:
-                        c.execute("INSERT INTO current_calls VALUES (?,?,?,?,?)", data)
+                        rel_cause = calls_state
+                        c.execute("INSERT INTO current_calls VALUES (?,?,?,?,?,?)", data)
                         conn.commit()
                         self._db_signal.emit(data)
                         self._signal.emit((FRAME_SUCCESS, "Nowe połączenie: %s" % calling))
                         self._signal_connection.emit((NEW_CONNECTION,"%s" % calling))
                     except sqlite3.IntegrityError as e:
-                        data = (calls_state,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),cr)
-                        c.execute("UPDATE current_calls SET calls_state = ?, start_time = ? WHERE cr = ?", data)
+                        data = (calls_state,rel_cause,now,cr)
+                        c.execute("UPDATE current_calls SET calls_state = ?, rel_cause = ?, start_time = ? WHERE cr = ?", data)
                         conn.commit()
                         self._db_signal.emit(data)
                         self._signal.emit((FRAME_SUCCESS, "Połącznie zakończone"))
                         self._signal_connection.emit((RELEASE_CONNECTION,'0'))
+                    except Exception as e:
+                        print(str(e))
+
+                        #message = b'<XCTIP><Calls><Register_REQ><CId>1</CId></Register_REQ></Calls></XCTIP>'
+                    #self.sock.sendall(message)
                     
                 log = elem.findall(".//LogInfo_ANS")
                 for row in log:
@@ -326,9 +344,7 @@ class SocketThread(QThread):
                     None,
                     "Error!",
                     "Error: %s" % str(e),
-                )
-                
-
+                )                
 
 class CentralWidget(QWidget):
     def __init__(self):
@@ -342,6 +358,8 @@ class CentralWidget(QWidget):
 
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
+
+        self._calling_number = 0
 
         con = QSqlDatabase.addDatabase("QSQLITE")
         con.setDatabaseName("silican.sqlite")
@@ -462,8 +480,9 @@ class CentralWidget(QWidget):
         model.setHeaderData(0, Qt.Horizontal, "ID połączenia")
         model.setHeaderData(1, Qt.Horizontal, "Data i godzina")
         model.setHeaderData(2, Qt.Horizontal, "Typ")
-        model.setHeaderData(3, Qt.Horizontal, "Numer")
-        model.setHeaderData(4, Qt.Horizontal, "Numer wew")
+        model.setHeaderData(3, Qt.Horizontal, "Akcja")
+        model.setHeaderData(4, Qt.Horizontal, "Numer")
+        model.setHeaderData(5, Qt.Horizontal, "Numer wew")
         model.select()
 
     def setup_model(self,model,table):
@@ -536,6 +555,15 @@ class CallsQSqlTableModel(QSqlTableModel):
            if v == 'Release_ST':
                #self._color = QtCore.Qt.yellow
                return "Zakończone"
+           if v == 'Connect_ST':
+               self._color = QtCore.Qt.yellow
+               return "Połączone"
+           if v == 'call_intercepted':
+               self._color = QtCore.Qt.green
+               return "Odebrane w grupie"
+           if v == 'Disconnect_ST':
+               self._color = QtCore.Qt.green
+               return "Odebrane"
                
        return v
    
@@ -555,3 +583,4 @@ if __name__ == "__main__":
     ex = Window()
     ex.show()
     sys.exit(app.exec_())
+            

@@ -91,6 +91,10 @@ class SilicanConnectionThread(SilicanThreadBase):
                 if row.find(".//Called/Number") is not None:
                     called = row.find(".//Called/Number").text
 
+                rel_cause = ''
+                if row.find(".//RelCause") is not None:
+                    rel_cause = row.find(".//RelCause").text
+                    
                 if calls_state == "NewCall_ST":
                     self._signal.emit((config.SILICAN_CONNECTION,calling))
                     user = db.find_user(str(calling))
@@ -98,17 +102,17 @@ class SilicanConnectionThread(SilicanThreadBase):
                         self._signal.emit((config.SILICAN_USER_FOUND,user))
                         calling = user['tel_Numer']
 
-
                     sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called)
                     self._signal.emit((config.SILICAN_SQL,sql))
-                    #try:
-                    #    c.execute("INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called))
-                    #    conn.commit()
-                    #except sqlite3.IntegrityError as e:
-                        #data = (calls_state,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),cr)
-                        #c.execute("UPDATE current_calls SET calls_state = ?, start_time = ? WHERE cr = ?", data)
-                        #conn.commit()
-                    #    raise
+
+                if calls_state == "Connect_ST":
+                    sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (calls_state,cr)
+                    self._signal.emit((config.SILICAN_SQL,sql))
 
                 if calls_state == "Release_ST":
                     self._signal.emit((config.SILICAN_RELEASE,''))
+                    if rel_cause:
+                        sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
+                        self._signal.emit((config.SILICAN_SQL,sql))
+
+                    

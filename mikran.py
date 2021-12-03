@@ -16,6 +16,8 @@ from datetime import datetime
 
 import db,gt,config,silican,slack
 
+Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         """Initializer."""
@@ -147,8 +149,9 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.SILICAN_SQL:
             query = QtSql.QSqlQuery()
             query.exec(data[1])
+            self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
+            self.calls_model.select()
 
-            #@QtCore.pyqtSlot()
     def signal_gt(self,data):
         if data[0] == config.ODBC_ERROR:
             QtWidgets.QMessageBox.critical(
@@ -179,12 +182,12 @@ class Window(QtWidgets.QMainWindow):
             query.exec(data[1])
 
     def addModels(self):
-        self.users_model = MikranTableModel(self)
+        self.users_model = MikranTableModel(config=self.config)
         self.users_model.setTable("users")
         self.users_model.select()
 
-        self.calls_model = MikranTableModel()
-        self.calls_model.setQuery(QtSql.QSqlQuery("SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
+        self.calls_model = MikranTableModel(config=self.config)
+        self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
         self.calls_model.select()
 
     def addViews(self):
@@ -223,6 +226,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_calls.model().setHeaderData(self.calls_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_calls.model().setHeaderData(self.calls_columns['calls_state'], Qt.Horizontal, "Status")
         self.tableview_calls.model().setHeaderData(self.calls_columns['called_number'], Qt.Horizontal, "Linia")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['calling_number'], Qt.Horizontal, "Nr telefonu")
         self.tableview_calls.model().setHeaderData(self.calls_columns['adr_NazwaPelna'], Qt.Horizontal, "Nazwa")
         self.tableview_calls.model().setHeaderData(self.calls_columns['adr_NIP'], Qt.Horizontal, "NIP")
         self.tableview_calls.model().setHeaderData(self.calls_columns['adr_Miejscowosc'], Qt.Horizontal, "Miejscowość")
@@ -350,24 +354,27 @@ class CustomerDialog(QtWidgets.QDialog):
         )
 
 class MikranTableModel(QtSql.QSqlTableModel):
-    def __init__(self, dbcursor=None):
+    def __init__(self, config):
         super(MikranTableModel, self).__init__()
-        #self._color = QtCore.Qt.gray
+        self.config = config
+        self._color = QtCore.Qt.gray
 
-    def data(self, QModelIndex, role=None):
-       v = QtSql.QSqlTableModel.data(self, QModelIndex, role);
+    def data(self, index, role=None):
+       v = QtSql.QSqlTableModel.data(self, index, role);
 
-       #if role == QtCore.Qt.BackgroundRole:
-       #    return QtGui.QColor(self._color)
+       if role == QtCore.Qt.BackgroundRole:
+           if self._color:
+               return QtGui.QBrush(self._color)
 
        if role == Qt.DisplayRole:
          #  self._color = QtCore.Qt.gray
+           self._color = None
            if v == 'NewCall_ST':
-               self._color = QtCore.Qt.green
+               self._color = QtCore.Qt.yellow
                return "Nowe połączenie"
            if v == 'Connect_ST':
-               self._color = QtCore.Qt.yellow
-               return "Połączone"
+               self._color = QtCore.Qt.green
+               return "Odebrane u mnie (%s)" % self.config['login']
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"

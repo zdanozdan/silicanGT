@@ -16,8 +16,6 @@ from datetime import datetime
 
 import db,gt,config,silican,slack
 
-Q1 = "SELECT start_time as Godzina, calls_state as Stan, calling_number as Numer_tel, called_number as Linia_tel,adr_NazwaPelna as Adres, adr_NIP as NIP, adr_Miejscowosc as Miejscowosc, adr_Ulica as Ulica FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
-
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         """Initializer."""
@@ -29,15 +27,7 @@ class Window(QtWidgets.QMainWindow):
         self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
-        try:
-            db.load_slack_users()
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                None,
-                "Slack error",
-                "SlackError: %s" % str(e),
-            )
-            
+        db.load_slack_users()
         self.con = db.create_con()
         if not self.con.open():
             QtWidgets.QMessageBox.critical(
@@ -146,7 +136,6 @@ class Window(QtWidgets.QMainWindow):
             self.adres.setText("...")
             self.nip.setText("...")
             self._calling_number = data[1]
-            self.statusBar().showMessage('Połączenie od: %s ' % data[1])
 
         if data[0] == config.SILICAN_RELEASE:
             self.phonenumber.setText("Zakończono: %s" % self._calling_number)
@@ -158,8 +147,6 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.SILICAN_SQL:
             query = QtSql.QSqlQuery()
             query.exec(data[1])
-            self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
-            self.calls_model.select()
 
             #@QtCore.pyqtSlot()
     def signal_gt(self,data):
@@ -196,8 +183,8 @@ class Window(QtWidgets.QMainWindow):
         self.users_model.setTable("users")
         self.users_model.select()
 
-        self.calls_model = QtSql.QSqlRelationalTableModel(self)
-        self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
+        self.calls_model = MikranTableModel()
+        self.calls_model.setQuery(QtSql.QSqlQuery("SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"))
         self.calls_model.select()
 
     def addViews(self):
@@ -210,22 +197,36 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_users.sortByColumn(0, Qt.AscendingOrder);
         self.tableview_users.setSortingEnabled(True)
         self.tableview_users.setWordWrap(True);
+        self.tableview_users.hideColumn(0)
         self.tableview_users.update()
+        self.users_columns = {self.tableview_users.model().headerData(x, QtCore.Qt.Horizontal):x for x in range(self.tableview_users.model().columnCount())}
 
         self.tableview_calls = CallsTableView()
         self.tableview_calls.setAlternatingRowColors(True);
         self.tableview_calls.setModel(self.calls_model)
-        #self.tableview_calls.hideColumn(0)
-        #self.tableview_calls.hideColumn(3)
-        #self.tableview_calls.hideColumn(5)
-        #self.tableview_calls.hideColumn(6)
-        #self.tableview_calls.hideColumn(13)
         self.tableview_calls.resizeColumnsToContents()
         self.tableview_calls.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.tableview_calls.sortByColumn(0, Qt.AscendingOrder);
         self.tableview_calls.setSortingEnabled(True)
         self.tableview_calls.setWordWrap(True);
         self.tableview_calls.update()
+        self.calls_columns = {self.tableview_calls.model().headerData(x, QtCore.Qt.Horizontal):x for x in range(self.tableview_calls.model().columnCount())}
+
+        self.tableview_calls.hideColumn(self.calls_columns['cr'])
+        self.tableview_calls.hideColumn(self.calls_columns['adr_id'])
+        self.tableview_calls.hideColumn(self.calls_columns['adr_CountryCode'])
+        self.tableview_calls.hideColumn(self.calls_columns['adr_CountryCode'])
+        self.tableview_calls.hideColumn(self.calls_columns['tel_Numer'])
+        self.tableview_calls.hideColumn(self.calls_columns['pa_Nazwa'])
+        self.tableview_calls.hideColumn(self.calls_columns['adr_Adres'])
+
+        self.tableview_calls.model().setHeaderData(self.calls_columns['start_time'], Qt.Horizontal, "Czas i data")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['calls_state'], Qt.Horizontal, "Status")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['called_number'], Qt.Horizontal, "Linia")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['adr_NazwaPelna'], Qt.Horizontal, "Nazwa")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['adr_NIP'], Qt.Horizontal, "NIP")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['adr_Miejscowosc'], Qt.Horizontal, "Miejscowość")
+        self.tableview_calls.model().setHeaderData(self.calls_columns['adr_Ulica'], Qt.Horizontal, "Ulica")
 
     def addTabs(self,vbox):
         self.tabs = QtWidgets.QTabWidget()
@@ -325,6 +326,7 @@ class CustomerDialog(QtWidgets.QDialog):
         self.textbox.setPlainText("\r\n".join(m))
         
         layout.addRow(QtWidgets.QLabel("Wiadomość:"), self.textbox)
+        users = slack.get_members()
         self.cb = QtWidgets.QComboBox()
         self.cb.addItem('')
         slack_users = db.slack_users_list()
@@ -348,9 +350,29 @@ class CustomerDialog(QtWidgets.QDialog):
         )
 
 class MikranTableModel(QtSql.QSqlTableModel):
-   def __init__(self, dbcursor=None):
-       super(MikranTableModel, self).__init__()
-       #self._color = QtCore.Qt.gray
+    def __init__(self, dbcursor=None):
+        super(MikranTableModel, self).__init__()
+        #self._color = QtCore.Qt.gray
+
+    def data(self, QModelIndex, role=None):
+       v = QtSql.QSqlTableModel.data(self, QModelIndex, role);
+
+       #if role == QtCore.Qt.BackgroundRole:
+       #    return QtGui.QColor(self._color)
+
+       if role == Qt.DisplayRole:
+         #  self._color = QtCore.Qt.gray
+           if v == 'NewCall_ST':
+               self._color = QtCore.Qt.green
+               return "Nowe połączenie"
+           if v == 'Connect_ST':
+               self._color = QtCore.Qt.yellow
+               return "Połączone"
+           if v == 'call_intercepted':
+               self._color = QtCore.Qt.green
+               return "Odebrane w grupie"
+       return v
+
        
 class CallsTableView(QtWidgets.QTableView):
     def mouseDoubleClickEvent(self, event):

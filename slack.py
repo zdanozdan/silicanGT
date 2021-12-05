@@ -1,11 +1,10 @@
-from slack_sdk.webhook import WebhookClient
 from slack_sdk import WebClient
 import db
 
 def send_message(message):
     config = db.load_config()
-    webhook = WebhookClient(config['slack_url'])
-    response = webhook.send(text=message)
+    client = WebClient(token=config['slack_token'])
+    response = client.chat_postMessage(text=message,channel="mikran_ogolnie")
     return response
 
 def get_members():

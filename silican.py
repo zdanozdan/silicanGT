@@ -29,14 +29,19 @@ class SilicanThreadBase(QThread):
             self._signal.emit((config.SILICAN_ERROR,str(e)))
             #raise
 
+    def sendall(self,message):
+        try:
+            self.sock.sendall(message)
+        except Exception as e:
+            self._signal.emit((config.SILICAN_ERROR,str(e)))
+
     def login(self):
         message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.config['login'],self.config['password'])
-        self.sock.sendall(message.encode('UTF-8'))
+        self.sendall(message.encode('UTF-8'))
 
     def register_req(self):
-        #message = b'<XCTIP><Calls><Register_REQ><CId>1</CId><Id>1001</Id><Pass>mikran123</Pass></Register_REQ></Calls></XCTIP>'
         message = b'<XCTIP><Calls><Register_REQ><CId>1</CId></Register_REQ></Calls></XCTIP>'
-        self.sock.sendall(message)
+        self.sendall(message)
 
     def read_frame(self):
         self.parser.feed("<root>")

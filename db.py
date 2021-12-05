@@ -41,6 +41,15 @@ def init_db():
     conn.commit()
     conn.close()
 
+def get_columns(select_query):
+    conn = sqlite3.connect(LOCAL_DB)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(select_query)
+    row = c.fetchone()
+    conn.close()
+    return row.keys()    
+
 def load_slack_users():
     conn = sqlite3.connect(LOCAL_DB)
     conn.row_factory = sqlite3.Row

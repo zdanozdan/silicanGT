@@ -12,11 +12,13 @@ from PyQt5 import QtSql
 import xml.etree.ElementTree as ET
 #sqlite
 import sqlite3
-from datetime import datetime
+import datetime,timeago
 
 import db,gt,config,silican,slack
 
 Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+
+Q1_FILTER = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer WHERE %s ORDER BY start_time DESC"
 
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
@@ -29,6 +31,7 @@ class Window(QtWidgets.QMainWindow):
         self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
+        self.current_calls_columns = db.get_columns(Q1)
         db.load_slack_users()
         self.con = db.create_con()
         if not self.con.open():
@@ -115,6 +118,7 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.SILICAN_CONNECTED:
             self.statusBar().showMessage('Centrala podłączona')
         if data[0] == config.SILICAN_ERROR:
+            self.statusBar().setStyleSheet("color: red")
             self.statusBar().showMessage('Nie udało się podłączyć do centrali')
             QtWidgets.QMessageBox.critical(
                 None,
@@ -204,7 +208,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_users.update()
         self.users_columns = {self.tableview_users.model().headerData(x, QtCore.Qt.Horizontal):x for x in range(self.tableview_users.model().columnCount())}
 
-        self.tableview_calls = CallsTableView()
+        self.tableview_calls = CallsTableView(self.current_calls_columns)
         self.tableview_calls.setAlternatingRowColors(True);
         self.tableview_calls.setModel(self.calls_model)
         self.tableview_calls.resizeColumnsToContents()
@@ -251,7 +255,7 @@ class Window(QtWidgets.QMainWindow):
 
         layout_calls = QtWidgets.QVBoxLayout()
         line_edit_calls = QtWidgets.QLineEdit()
-        #line_edit.textChanged.connect(self.filter_users)
+        line_edit_calls.textChanged.connect(self.filter_calls)
         layout_calls.addWidget(line_edit_calls)
         layout_calls.addWidget(self.tableview_calls)
         self.tab1.setLayout(layout_calls)
@@ -289,6 +293,13 @@ class Window(QtWidgets.QMainWindow):
     def settings(self):        
         self.settings_widget.show()
 
+    def filter_calls(self,data):
+        if data:
+            f = " (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')"
+            sql = Q1_FILTER % f
+            self.calls_model.setQuery(QtSql.QSqlQuery(sql))
+            self.calls_model.select()
+        
     def filter_users(self,data):
         if data:
             self.users_model.setFilter(" (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')")
@@ -378,20 +389,29 @@ class MikranTableModel(QtSql.QSqlTableModel):
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"
+           try:
+               dt = datetime.datetime.strptime(v,"%m-%d-%Y, %H:%M:%S")
+               v = dt.strftime("%A, %m-%d-%Y, %H:%M:%S")
+           except Exception as e:
+               pass
+           
        return v
 
        
 class CallsTableView(QtWidgets.QTableView):
+    def __init__(self,current_calls_columns,parent=None):
+        self.current_calls_columns = current_calls_columns
+        super(CallsTableView,self).__init__(parent)
+        
     def mouseDoubleClickEvent(self, event):
         current_row = self.currentIndex().row()
         selected = []
         
         for i in range(self.model().columnCount()):
-            col = self.model().headerData(i,Qt.Horizontal)
+            col = self.current_calls_columns[i]
             index = self.model().index(current_row,i)
-            selected.append((col,self.model().data(index)))
+            selected.append((col,self.model().data(index,Qt.ItemDataRole.DisplayRole)))
 
-        print(dict(selected))
         dlg = CustomerDialog(dict(selected))
         dlg.exec()
             

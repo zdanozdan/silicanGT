@@ -298,7 +298,10 @@ class Window(QtWidgets.QMainWindow):
             f = " (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')"
             sql = Q1_FILTER % f
             self.calls_model.setQuery(QtSql.QSqlQuery(sql))
-            self.calls_model.select()
+        else:
+            self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
+
+        self.calls_model.select()
         
     def filter_users(self,data):
         if data:

@@ -47,8 +47,9 @@ def get_columns(select_query):
     c = conn.cursor()
     c.execute(select_query)
     row = c.fetchone()
+    keys = row.keys()
     conn.close()
-    return row.keys()    
+    return keys    
 
 def load_slack_users():
     conn = sqlite3.connect(LOCAL_DB)

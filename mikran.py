@@ -114,6 +114,10 @@ class Window(QtWidgets.QMainWindow):
         silican_thread._signal.connect(self.signal_silican)
         silican_thread.start()
 
+        silican_history_thread = silican.SilicanHistoryThread(parent=self)
+        silican_thread._signal.connect(self.signal_silican)
+        silican_thread.start()
+
     def signal_silican(self,data):
         if data[0] == config.SILICAN_CONNECTED:
             self.statusBar().showMessage('Centrala podłączona')

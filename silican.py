@@ -208,7 +208,7 @@ class SilicanHistoryThread(SilicanThreadBase):
                             
                         data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname)
                         sql = "REPLACE INTO history_calls (marker,row_type,sync_type,hid,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % data
-                        self._signal.emit((config.SILICAN_SQL,sql))
+                        self._signal.emit((config.SILICAN_HISTORY_SQL,sql))
                         self.request_marker(marker)
 
         print("FINISHED")

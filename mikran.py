@@ -191,6 +191,12 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == config.SILICAN_SETRANGE:
             self.pbar.setMaximum(int(data[1]))
 
+        if data[0] == config.SILICAN_HISTORY_SQL:
+            query = QtSql.QSqlQuery()
+            query.exec(data[1])
+            self.history_model.setQuery(QtSql.QSqlQuery(Q2))
+            self.history_model.select()
+
     def signal_gt(self,data):
         if data[0] == config.ODBC_ERROR:
             QtWidgets.QMessageBox.critical(

@@ -11,10 +11,7 @@ PrivilegesRequired=admin
 [Files]
 Source: "dist/mikran.exe"; DestDir: "{app}"
 Source: "yoda.png"; DestDir: "{app}"
-
-[Registry]
-;any user
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Mikran2S"; ValueData: "{app}\mikran.exe"; Tasks:AutoRunRegistry;
+Source: "slack.txt"; DestDir: "{app}"
 
 [Icons] 
-Name: "{commonstartup}\Mikran2S"; Filename: "{app}\mikran.exe"
+Name: "{commonstartup}\Mikran2s"; Filename: "{app}\mikran.exe"

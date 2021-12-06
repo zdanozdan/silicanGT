@@ -25,14 +25,30 @@ class Window(QtWidgets.QMainWindow):
         """Initializer."""
         super().__init__(parent)
         self.setWindowTitle("mikran.pl - integracja centrali telefonicznej")
+        print("mikran.pl - integracja centrali telefonicznej")
         self.setWindowIcon(QIcon('yoda.png')) 
         self.resize(800, 600)
         self.statusBar().showMessage('mikran.pl. Ready')
         self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
-        self.current_calls_columns = db.get_columns(Q1)
-        db.load_slack_users()
+        self.current_calls_columns = []
+        try:
+            self.current_calls_columns = db.get_columns(Q1)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Error",
+                "Error: %s" % str(e),
+            )
+        try:
+            db.load_slack_users()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Slack error",
+                "Slack Error: %s" % str(e),
+            )
         self.con = db.create_con()
         if not self.con.open():
             QtWidgets.QMessageBox.critical(

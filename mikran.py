@@ -20,6 +20,8 @@ Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_numbe
 
 Q1_FILTER = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer WHERE %s ORDER BY start_time DESC"
 
+Q2 = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         """Initializer."""
@@ -108,6 +110,11 @@ class Window(QtWidgets.QMainWindow):
         usersAction.setStatusTip('Pobierz konkrahentów z baz danych')
         usersAction.triggered.connect(self.usersActionThread)
 
+        historyAction = QtWidgets.QAction(QIcon('history.png'), '&Pobierz historię (wew: '+self.config['login']+')', self)
+        historyAction.setShortcut('Ctrl+I')
+        historyAction.setStatusTip('Pobierz historię dla tego numeru wew')
+        historyAction.triggered.connect(self.historyActionThread)
+
         settingsAction = QtWidgets.QAction(QIcon('settings.png'), '&Ustawienia', self)
         settingsAction.setShortcut('Ctrl+U')
         settingsAction.setStatusTip('UStawienia')
@@ -116,6 +123,7 @@ class Window(QtWidgets.QMainWindow):
         mainMenu = self.menuBar()
         fileMenu = mainMenu.addMenu('&Plik')
         fileMenu.addAction(usersAction)
+        fileMenu.addAction(historyAction)
         fileMenu.addAction(settingsAction)
 
     def usersActionThread(self):
@@ -123,14 +131,15 @@ class Window(QtWidgets.QMainWindow):
         gt_thread._signal.connect(self.signal_gt)
         gt_thread.start()
         self.statusBar().setStyleSheet("color: green")
-        self.statusBar().showMessage('Pobieranie listy kontrahentów ....')        
+        self.statusBar().showMessage('Pobieranie listy kontrahentów ....')
+
+    def historyActionThread(self):
+        silican_history_thread = silican.SilicanHistoryThread(parent=self)
+        silican_history_thread._signal.connect(self.signal_silican)
+        silican_history_thread.start()
 
     def start_threads(self):
         silican_thread = silican.SilicanConnectionThread(parent=self)
-        silican_thread._signal.connect(self.signal_silican)
-        silican_thread.start()
-
-        silican_history_thread = silican.SilicanHistoryThread(parent=self)
         silican_thread._signal.connect(self.signal_silican)
         silican_thread.start()
 
@@ -176,6 +185,12 @@ class Window(QtWidgets.QMainWindow):
             self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
             self.calls_model.select()
 
+        if data[0] == config.SILICAN_PROGRESS:            
+            self.pbar.setValue(int(data[1]))
+
+        if data[0] == config.SILICAN_SETRANGE:
+            self.pbar.setMaximum(int(data[1]))
+
     def signal_gt(self,data):
         if data[0] == config.ODBC_ERROR:
             QtWidgets.QMessageBox.critical(
@@ -214,7 +229,22 @@ class Window(QtWidgets.QMainWindow):
         self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
         self.calls_model.select()
 
+        self.history_model = MikranTableModel(config=self.config)
+        self.history_model.setQuery(QtSql.QSqlQuery(Q2))
+        self.history_model.select()
+
     def addViews(self):
+        self.tableview_history = QtWidgets.QTableView()
+        self.tableview_history.setAlternatingRowColors(True);
+        self.tableview_history.setModel(self.history_model)
+        self.tableview_history.resizeColumnsToContents()
+        self.tableview_history.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.tableview_history.sortByColumn(0, Qt.AscendingOrder);
+        self.tableview_history.setSortingEnabled(True)
+        self.tableview_history.setWordWrap(True);
+        self.tableview_history.hideColumn(0)
+        self.tableview_history.update()
+        
         self.tableview_users = QtWidgets.QTableView()
         self.tableview_users.setAlternatingRowColors(True);
         #self.tableview_users.setStyleSheet("alternate-background-color: yellow;background-color: red;");
@@ -261,8 +291,8 @@ class Window(QtWidgets.QMainWindow):
         self.tab1 = QtWidgets.QWidget()
         self.tab2 = QtWidgets.QWidget()
         self.tab3 = QtWidgets.QWidget()
-        self.tabs.addTab(self.tab1,"Bieżące połączenia")
-        #self.tabs.addTab(self.tab2,"Historyczne")
+        self.tabs.addTab(self.tab1,"Bieżące połączenia ( wew "+self.config['login']+" )")
+        self.tabs.addTab(self.tab2,"Historyczne dla ( wew "+self.config['login']+" )")
         self.tabs.addTab(self.tab3,"Kontakty")
         vbox.addWidget(self.tabs)
 
@@ -279,6 +309,13 @@ class Window(QtWidgets.QMainWindow):
         layout_calls.addWidget(line_edit_calls)
         layout_calls.addWidget(self.tableview_calls)
         self.tab1.setLayout(layout_calls)
+
+        layout_history = QtWidgets.QVBoxLayout()
+        line_edit_history = QtWidgets.QLineEdit()
+        #line_edit_history.textChanged.connect(self.filter_history)
+        layout_history.addWidget(line_edit_history)
+        layout_history.addWidget(self.tableview_history)
+        self.tab2.setLayout(layout_history)
         
     def createSettingsWigdet(self):
         self.settings_widget = QtWidgets.QDialog()

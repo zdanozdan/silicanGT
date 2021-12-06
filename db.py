@@ -38,6 +38,8 @@ def init_db():
 
     c.execute("CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
 
+    c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, calling_number varchar(255), cname varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))')
+
     conn.commit()
     conn.close()
 

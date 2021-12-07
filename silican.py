@@ -58,9 +58,6 @@ class SilicanThreadBase(QThread):
                         return elem
             except ET.ParseError as e:
                 pass
-            except socket.timeout as e:
-                print("Registering for Change_EV ......")
-                self.register_req()
             except Exception as e:
                 print(str(e))
             
@@ -79,7 +76,12 @@ class SilicanConnectionThread(SilicanThreadBase):
         self.register_req()
 
         while True:
-            elem = self.read_frame()
+            try:
+                elem = self.read_frame()
+            except socket.timeout as e:
+                print("Registering for Change_EV ......")
+                self.register_req()
+            
             change = elem.findall(".//Change_EV")
 
             for row in change:
@@ -127,15 +129,12 @@ class SilicanHistoryThread(SilicanThreadBase):
     def request_marker(self,marker,frames=1):
         message = '<XCTIP><Sync><Sync_REQ><CId>9</CId><Marker>%s</Marker><SyncType>HistoryCall</SyncType><Limit>%s</Limit></Sync_REQ></Sync></XCTIP>' % (marker,frames)
         self.sendall(message.encode('UTF-8'))
-        
-    def run(self):
-        self.parser = ET.XMLPullParser(['end'])
-        self.connect()
-        self.sock.settimeout(60)
-        self.login()
-        self.last_marker = ''
-        self.request_marker(self.last_marker,2)
 
+    def register_history_request(self):
+        message = "<XCTIP><Sync><Register_REQ><CId>4</CId><SyncType>HistoryCall</SyncType></Register_REQ></Sync></XCTIP>"
+        self.sendall(message.encode('UTF-8'))
+
+    def loop(self):
         _rows = 0
         run = True
 
@@ -174,6 +173,7 @@ class SilicanHistoryThread(SilicanThreadBase):
                         if history_call.find('Attempts') is not None:
                             attempts = history_call.find('Attempts').text
 
+                        print("UPDATE")
                         #TODO subscribe for change event
 
                 if row_type == 'AddRow':
@@ -210,5 +210,23 @@ class SilicanHistoryThread(SilicanThreadBase):
                         sql = "REPLACE INTO history_calls (marker,row_type,sync_type,hid,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % data
                         self._signal.emit((config.SILICAN_HISTORY_SQL,sql))
                         self.request_marker(marker)
+        
+    def run(self):
+        self.parser = ET.XMLPullParser(['end'])
+        self.connect()
+        self.sock.settimeout(None)
+        self.login()
+        self.last_marker = ''
+        self.request_marker(self.last_marker,2)
+        self.loop()
+        print("FINISHED")
 
+class SilicanHistoryEventsThread(SilicanThreadBase):
+    def run(self):
+        self.parser = ET.XMLPullParser(['end'])
+        self.connect()
+        self.sock.settimeout(60)
+        self.login()
+        self.register_history_request()
+        self.loop()
         print("FINISHED")

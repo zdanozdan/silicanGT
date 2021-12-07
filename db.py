@@ -43,6 +43,27 @@ def init_db():
     conn.commit()
     conn.close()
 
+def deleteUsers():
+    conn = sqlite3.connect(LOCAL_DB)
+    c = conn.cursor()
+    c.execute("DELETE FROM users")
+    conn.commit()
+    conn.close()
+
+def deleteCalls():
+    conn = sqlite3.connect(LOCAL_DB)
+    c = conn.cursor()
+    c.execute("DELETE FROM current_calls")
+    conn.commit()
+    conn.close()
+
+def deleteHistory():
+    conn = sqlite3.connect(LOCAL_DB)
+    c = conn.cursor()
+    c.execute("DELETE FROM history_calls")
+    conn.commit()
+    conn.close()
+
 def get_columns(select_query):
     conn = sqlite3.connect(LOCAL_DB)
     conn.row_factory = sqlite3.Row

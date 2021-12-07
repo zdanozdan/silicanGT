@@ -17,10 +17,13 @@ import datetime,timeago
 import db,gt,config,silican,slack
 
 Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+Q1_LIMIT = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer LIMIT 1"
 
 Q1_FILTER = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer WHERE %s ORDER BY start_time DESC"
 
 Q2 = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+
+Q2_LIMIT = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer LIMIT 1"
 
 class Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
@@ -36,7 +39,16 @@ class Window(QtWidgets.QMainWindow):
         self.config = db.load_config()
         self.current_calls_columns = []
         try:
-            self.current_calls_columns = db.get_columns(Q1)
+            self.current_calls_columns = db.get_columns(Q1_LIMIT)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Error",
+                "Error: %s" % str(e),
+            )
+        self.history_calls_columns = []
+        try:
+            self.history_calls_columns = db.get_columns(Q2_LIMIT)
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 None,
@@ -125,6 +137,20 @@ class Window(QtWidgets.QMainWindow):
         fileMenu.addAction(usersAction)
         fileMenu.addAction(historyAction)
         fileMenu.addAction(settingsAction)
+
+        deleteUsersAction = QtWidgets.QAction(QIcon('delete.png'), '&Usuń kontrahentów', self)
+        deleteUsersAction.triggered.connect(self.deleteUsers)
+
+        deleteHistoryAction = QtWidgets.QAction(QIcon('delete.png'), '&Usuń historię połączeń', self)
+        deleteHistoryAction.triggered.connect(self.deleteHistory)
+
+        deleteCallsAction = QtWidgets.QAction(QIcon('delete.png'), '&Usuń bieżące połączenia', self)
+        deleteCallsAction.triggered.connect(self.deleteCalls)
+
+        advMenu = mainMenu.addMenu('&Zaawnsowane')
+        advMenu.addAction(deleteUsersAction)
+        advMenu.addAction(deleteHistoryAction)
+        advMenu.addAction(deleteCallsAction)
 
     def usersActionThread(self):
         gt_thread = gt.GTThread(parent=self)
@@ -240,7 +266,8 @@ class Window(QtWidgets.QMainWindow):
         self.history_model.select()
 
     def addViews(self):
-        self.tableview_history = QtWidgets.QTableView()
+        #self.tableview_history = QtWidgets.QTableView()
+        self.tableview_history = CallsTableView(self.history_calls_columns)
         self.tableview_history.setAlternatingRowColors(True);
         self.tableview_history.setModel(self.history_model)
         self.tableview_history.resizeColumnsToContents()
@@ -250,6 +277,24 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_history.setWordWrap(True);
         self.tableview_history.hideColumn(0)
         self.tableview_history.update()
+        self.history_columns = {self.tableview_history.model().headerData(x, QtCore.Qt.Horizontal):x for x in range(self.tableview_history.model().columnCount())}
+
+        self.tableview_history.hideColumn(self.history_columns['row_type'])
+        self.tableview_history.hideColumn(self.history_columns['sync_type'])
+        self.tableview_history.hideColumn(self.history_columns['hid'])
+        self.tableview_history.hideColumn(self.history_columns['adr_id'])
+        self.tableview_history.hideColumn(self.history_columns['adr_CountryCode'])
+        self.tableview_history.hideColumn(self.history_columns['tel_Numer'])
+        self.tableview_history.hideColumn(self.history_columns['pa_Nazwa'])
+        self.tableview_history.hideColumn(self.history_columns['adr_Adres'])
+        self.tableview_history.hideColumn(self.history_columns['cname'])
+
+        self.tableview_history.model().setHeaderData(self.history_columns['start_time'], Qt.Horizontal, "Czas i data")
+        self.tableview_history.model().setHeaderData(self.history_columns['h_type'], Qt.Horizontal, "Status")
+        self.tableview_history.model().setHeaderData(self.history_columns['dial_number'], Qt.Horizontal, "Linia")
+        self.tableview_history.model().setHeaderData(self.history_columns['duration_time'], Qt.Horizontal, "Czas połączenia")
+        self.tableview_history.model().setHeaderData(self.history_columns['calling_number'], Qt.Horizontal, "Numer telefonu")
+        self.tableview_history.model().setHeaderData(self.history_columns['attempts'], Qt.Horizontal, "Ilość prób")
         
         self.tableview_users = QtWidgets.QTableView()
         self.tableview_users.setAlternatingRowColors(True);
@@ -353,6 +398,28 @@ class Window(QtWidgets.QMainWindow):
         toolButton.clicked.connect(self.settings)
         toolBar.addWidget(toolButton)
 
+    def _deleteFromTable(self,table,model,query):
+        ret = QtWidgets.QMessageBox.question(self,'', "Na pewno usunąć ?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if ret == QtWidgets.QMessageBox.Yes:
+            query = QtSql.QSqlQuery()
+            query.exec("DELETE FROM %s" % table)
+            model.setQuery(query)
+            model.select()
+
+    def deleteUsers(self):
+        ret = QtWidgets.QMessageBox.question(self,'', "Na pewno usunąć ?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if ret == QtWidgets.QMessageBox.Yes:
+            query = QtSql.QSqlQuery()
+            query.exec("DELETE FROM users")
+            self.users_model.setTable("users")
+            self.users_model.select()
+
+    def deleteCalls(self):
+        self._deleteFromTable("current_calls",self.calls_model,QtSql.QSqlQuery(Q1))
+
+    def deleteHistory(self):
+        self._deleteFromTable("history_calls",self.history_model,QtSql.QSqlQuery(Q2))
+
     def settings(self):        
         self.settings_widget.show()
 
@@ -446,6 +513,15 @@ class MikranTableModel(QtSql.QSqlTableModel):
        if role == Qt.DisplayRole:
          #  self._color = QtCore.Qt.gray
            self._color = None
+           if v == 'InCall':
+               self._color = QtCore.Qt.green
+               return "Odebrane"
+           if v == 'OutCall':
+               self._color = QtCore.Qt.gray
+               return "Wychodzące"
+           if v == 'MissedCall':
+               self._color = QtCore.Qt.red
+               return "Nieodebrane"           
            if v == 'NewCall_ST':
                self._color = QtCore.Qt.yellow
                return "Nowe połączenie"
@@ -457,6 +533,12 @@ class MikranTableModel(QtSql.QSqlTableModel):
                return "Odebrane w grupie"
            try:
                dt = datetime.datetime.strptime(v,"%m-%d-%Y, %H:%M:%S")
+               v = dt.strftime("%A, %m-%d-%Y, %H:%M:%S")
+           except Exception as e:
+               pass
+
+           try:
+               dt = datetime.datetime.strptime(v,"%Y-%m-%d %H:%M:%S")
                v = dt.strftime("%A, %m-%d-%Y, %H:%M:%S")
            except Exception as e:
                pass
@@ -492,7 +574,6 @@ class CallsTableView(QtWidgets.QTableView):
                 "Usunięto rekord na pozycji %d" % self.currentIndex().row(),
             )
         super(CallsTableView, self).keyPressEvent(event)
-
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

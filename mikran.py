@@ -23,6 +23,8 @@ Q1_FILTER = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.callin
 
 Q2 = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
 
+Q2_FILTER = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer WHERE %s ORDER BY start_time DESC"
+
 Q2_LIMIT = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer LIMIT 1"
 
 class Window(QtWidgets.QMainWindow):
@@ -365,7 +367,7 @@ class Window(QtWidgets.QMainWindow):
 
         layout_history = QtWidgets.QVBoxLayout()
         line_edit_history = QtWidgets.QLineEdit()
-        #line_edit_history.textChanged.connect(self.filter_history)
+        line_edit_history.textChanged.connect(self.filter_history)
         layout_history.addWidget(line_edit_history)
         layout_history.addWidget(self.tableview_history)
         self.tab2.setLayout(layout_history)
@@ -424,6 +426,16 @@ class Window(QtWidgets.QMainWindow):
 
     def settings(self):        
         self.settings_widget.show()
+
+    def filter_history(self,data):
+        if data:
+            f = " (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')"
+            sql = Q2_FILTER % f
+            self.history_model.setQuery(QtSql.QSqlQuery(sql))
+        else:
+            self.history_model.setQuery(QtSql.QSqlQuery(Q2))
+
+        self.history_model.select()
 
     def filter_calls(self,data):
         if data:

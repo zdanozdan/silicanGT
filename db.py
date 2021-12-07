@@ -132,12 +132,6 @@ def insert_users(users,signal):
 
             sql = "REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres'])
             signal.emit((cfg.ODBC_SQL,sql))
-            #try:                
-            #    c.execute("REPLACE INTO users (adr_id,tel_Numer,adr_CountryCode,pa_Nazwa, adr_NazwaPelna,adr_NIP,adr_Miejscowosc,adr_Ulica,adr_Adres) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')" % (user['adr_Id'],tel_Numer,adr_CountryCode,user['pa_Nazwa'],user['adr_NazwaPelna'],user['adr_NIP'],user['adr_Miejscowosc'],user['adr_Ulica'],user['adr_Adres']))
-            #except sqlite3.IntegrityError as e:
-            #    pass
-            #except Exception as e:
-            #    print(str(e))
 
     signal.emit((cfg.ODBC_INSERT,0))
     conn.commit()

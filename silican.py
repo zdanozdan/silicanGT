@@ -58,8 +58,6 @@ class SilicanThreadBase(QThread):
                         return elem
             except ET.ParseError as e:
                 pass
-            except Exception as e:
-                print(str(e))
             
 
 class SilicanConnectionThread(SilicanThreadBase):
@@ -81,6 +79,8 @@ class SilicanConnectionThread(SilicanThreadBase):
             except socket.timeout as e:
                 print("Registering for Change_EV ......")
                 self.register_req()
+            except Exception as e:
+                print("SilicanConnectionThread: ",str(e))
             
             change = elem.findall(".//Change_EV")
 
@@ -134,99 +134,126 @@ class SilicanHistoryThread(SilicanThreadBase):
         message = "<XCTIP><Sync><Register_REQ><CId>4</CId><SyncType>HistoryCall</SyncType></Register_REQ></Sync></XCTIP>"
         self.sendall(message.encode('UTF-8'))
 
-    def loop(self):
-        _rows = 0
-        run = True
+    def loop(self,elem):
+        error = elem.findall(".//Error")
+        if error:
+            #ET.dump(error)
+            return False
 
-        while run:
-            self._signal.emit((config.SILICAN_SETRANGE,850))
-            elem = self.read_frame()
-            error = elem.findall(".//Error")
-            if error:
-                #ET.dump(error)
-                return
-
-            change = elem.findall(".//Change_EV")
-            if change:
-                #self.register_history_request()
-                self.request_marker(self.last_marker,2)
+        change = elem.findall(".//Change_EV")
+        if change:
+            self.request_marker(self.last_marker,2)
+            return True
                 
-            for row in elem.findall(".//Row"):
-                marker = row.find('Marker').text
-                row_type = row.find('RowType').text
-                sync_type = row.find('SyncType').text
-                history_call = row.find('HistoryCall')
-
-                _rows = _rows+1
-                self._signal.emit((config.SILICAN_PROGRESS,_rows))
+        for row in elem.findall(".//Row"):
+            marker = row.find('Marker').text
+            row_type = row.find('RowType').text
+            sync_type = row.find('SyncType').text
+            history_call = row.find('HistoryCall')
+            
+            #_rows = _rows+1
+            #self._signal.emit((config.SILICAN_PROGRESS,_rows))
                 
-                if row_type == "RowEnd":
-                    self._signal.emit((config.SILICAN_PROGRESS,850))
-                    run = False
+            if row_type == "RowEnd":
+            #    self._signal.emit((config.SILICAN_PROGRESS,850))
+                return False
 
-                if row_type == 'Update':
-                    if history_call is not None:
-                        start_time = history_call.find('StartTime').text
-                        h_id = history_call.find('HId').text
+            if row_type == 'Update':
+                if history_call is not None:
+                    start_time = history_call.find('StartTime').text
+                    h_id = history_call.find('HId').text
 
-                        attempts = 0
-                        if history_call.find('Attempts') is not None:
-                            attempts = history_call.find('Attempts').text
+                    attempts = 0
+                    if history_call.find('Attempts') is not None:
+                        attempts = history_call.find('Attempts').text
 
-                        print("UPDATE")
-                        #TODO subscribe for change event
+                    data = (start_time,attempts,h_id)
+                    sql = "UPDATE history_calls SET start_time = '%s', attempts = '%s' WHERE hid = '%s'" % data
+                    self._signal.emit((config.SILICAN_HISTORY_SQL,sql))
+                    print("UPDATE:",sql)
 
-                if row_type == 'AddRow':
-                    if history_call is not None:
-                        start_time = history_call.find('StartTime').text
-                        h_id = history_call.find('HId').text
+            if row_type == 'AddRow':
+                if history_call is not None:
+                    start_time = history_call.find('StartTime').text
+                    h_id = history_call.find('HId').text
                         
-                        h_type = history_call.find('HType').text
-                        duration_time = history_call.find('DurationTime').text
+                    h_type = history_call.find('HType').text
+                    duration_time = history_call.find('DurationTime').text
                                     
-                        dial_number = 0
-                        if history_call.find('DialNumber') is not None:
-                            dial_number = history_call.find('DialNumber').text
+                    dial_number = 0
+                    if history_call.find('DialNumber') is not None:
+                        dial_number = history_call.find('DialNumber').text
 
-                        calling = 0
-                        if history_call.find('CNumber') is not None:
-                            calling = history_call.find('CNumber').text
+                    calling = 0
+                    if history_call.find('CNumber') is not None:
+                        calling = history_call.find('CNumber').text
 
-                        cname = ''
-                        if history_call.find('CName') is not None:
-                            cname = history_call.find('CName').text
+                    cname = ''
+                    if history_call.find('CName') is not None:
+                        cname = history_call.find('CName').text
           
-                        attempts = 0
-                        if history_call.find('Attempts') is not None:
-                            attempts = history_call.find('Attempts').text
+                    attempts = 0
+                    if history_call.find('Attempts') is not None:
+                        attempts = history_call.find('Attempts').text
 
-                        user = db.find_user(str(calling))
-                        if user:
-                            calling_number = user['tel_Numer']
-                        else:
-                            calling_number = 0
-                            
-                        data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname)
-                        sql = "REPLACE INTO history_calls (marker,row_type,sync_type,hid,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % data
-                        self._signal.emit((config.SILICAN_HISTORY_SQL,sql))
-                        self.request_marker(marker)
+                    user = db.find_user(str(calling))
+                    if user:
+                        calling_number = user['tel_Numer']
+                    else:
+                        calling_number = calling
+                        
+                    data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname)
+                    sql = "REPLACE INTO history_calls (marker,row_type,sync_type,hid,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % data
+                    self._signal.emit((config.SILICAN_HISTORY_SQL,sql))
+                    self.request_marker(marker)
+
+        return True
         
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
         self.connect()
         self.sock.settimeout(None)
         self.login()
-        self.last_marker = ''
-        self.request_marker(self.last_marker,2)
-        self.loop()
+
+        try:
+            self.last_marker = db.get_last_marker()
+            self.request_marker(self.last_marker,1)
+        except:
+            self.last_marker = ''
+            self.request_marker(self.last_marker,2)
+
+        run = True
+        while run:
+            try:
+                elem = self.read_frame()
+                run = self.loop(elem)
+            except socket.timeout as e:
+                pass
+            except Exception as e:
+                print("SilicanHistoryThread: ",str(e))
+        
         print("FINISHED")
 
-class SilicanHistoryEventsThread(SilicanThreadBase):
+class SilicanHistoryEventsThread(SilicanHistoryThread):
     def run(self):
+        self.last_marker = ''
+        try:
+            self.last_marker = db.get_last_marker()
+        except:
+            pass
+        
         self.parser = ET.XMLPullParser(['end'])
         self.connect()
         self.sock.settimeout(60)
         self.login()
         self.register_history_request()
-        self.loop()
-        print("FINISHED")
+        
+        while True:
+            try:
+                elem = self.read_frame()
+                run = self.loop(elem)
+            except socket.timeout as e:
+                print("Re-register for events")
+                self.register_history_request()
+            except Exception as e:
+                print("SilicanHistoryEventsThread: ",str(e))

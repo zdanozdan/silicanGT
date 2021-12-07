@@ -169,7 +169,9 @@ class Window(QtWidgets.QMainWindow):
         silican_thread._signal.connect(self.signal_silican)
         silican_thread.start()
 
-        #history_ev_thread = silican.SilicanHistoryEventsThread=self)
+        history_ev_thread = silican.SilicanHistoryEventsThread(parent=self)
+        history_ev_thread._signal.connect(self.signal_silican)
+        history_ev_thread.start()
 
     def signal_silican(self,data):
         if data[0] == config.SILICAN_CONNECTED:
@@ -268,7 +270,6 @@ class Window(QtWidgets.QMainWindow):
         self.history_model.select()
 
     def addViews(self):
-        #self.tableview_history = QtWidgets.QTableView()
         self.tableview_history = CallsTableView(self.history_calls_columns)
         self.tableview_history.setAlternatingRowColors(True);
         self.tableview_history.setModel(self.history_model)
@@ -277,10 +278,10 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_history.sortByColumn(0, Qt.AscendingOrder);
         self.tableview_history.setSortingEnabled(True)
         self.tableview_history.setWordWrap(True);
-        self.tableview_history.hideColumn(0)
         self.tableview_history.update()
         self.history_columns = {self.tableview_history.model().headerData(x, QtCore.Qt.Horizontal):x for x in range(self.tableview_history.model().columnCount())}
 
+        self.tableview_history.hideColumn(self.history_columns['marker'])
         self.tableview_history.hideColumn(self.history_columns['row_type'])
         self.tableview_history.hideColumn(self.history_columns['sync_type'])
         self.tableview_history.hideColumn(self.history_columns['hid'])
@@ -295,7 +296,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_history.model().setHeaderData(self.history_columns['h_type'], Qt.Horizontal, "Status")
         self.tableview_history.model().setHeaderData(self.history_columns['dial_number'], Qt.Horizontal, "Linia")
         self.tableview_history.model().setHeaderData(self.history_columns['duration_time'], Qt.Horizontal, "Czas połączenia")
-        self.tableview_history.model().setHeaderData(self.history_columns['calling_number'], Qt.Horizontal, "Numer telefonu")
+        #self.tableview_history.model().setHeaderData(self.history_columns['calling_number'], Qt.Horizontal, "Numer telefonu")
         self.tableview_history.model().setHeaderData(self.history_columns['attempts'], Qt.Horizontal, "Ilość prób")
         
         self.tableview_users = QtWidgets.QTableView()
@@ -307,7 +308,6 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_users.sortByColumn(0, Qt.AscendingOrder);
         self.tableview_users.setSortingEnabled(True)
         self.tableview_users.setWordWrap(True);
-        self.tableview_users.hideColumn(0)
         self.tableview_users.update()
         self.users_columns = {self.tableview_users.model().headerData(x, QtCore.Qt.Horizontal):x for x in range(self.tableview_users.model().columnCount())}
 

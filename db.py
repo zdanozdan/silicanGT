@@ -72,7 +72,16 @@ def get_columns(select_query):
     row = c.fetchone()
     keys = row.keys()
     conn.close()
-    return keys    
+    return keys
+
+def get_last_marker():
+    conn = sqlite3.connect(LOCAL_DB)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT start_time,marker,hid FROM history_calls ORDER BY hid DESC")
+    row = c.fetchone()
+    conn.close()
+    return row['marker']
 
 def load_slack_users():
     conn = sqlite3.connect(LOCAL_DB)

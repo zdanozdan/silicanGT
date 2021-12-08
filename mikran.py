@@ -16,6 +16,8 @@ import datetime,timeago
 
 import db,gt,config,silican,slack
 
+VERSION_NUMBER = "1.0.0"
+
 Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
 Q1_LIMIT = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer LIMIT 1"
 
@@ -168,6 +170,11 @@ class Window(QtWidgets.QMainWindow):
         advMenu.addAction(deleteUsersAction)
         advMenu.addAction(deleteHistoryAction)
         advMenu.addAction(deleteCallsAction)
+
+        versionAction = QtWidgets.QAction(QIcon('delete.png'), '&Wersja', self)
+        versionAction.triggered.connect(self.version)
+        verMenu = mainMenu.addMenu('&Pomoc')
+        verMenu.addAction(versionAction)
 
     def usersActionThread(self):
         gt_thread = gt.GTThread(parent=self)
@@ -450,6 +457,13 @@ class Window(QtWidgets.QMainWindow):
             query.exec("DELETE FROM users")
             self.users_model.setTable("users")
             self.users_model.select()
+
+    def version(self):
+        QtWidgets.QMessageBox.information(
+            None,
+            "Wersja  %s" % VERSION_NUMBER,
+            "Wersja  %s" % VERSION_NUMBER,
+        )
 
     def deleteCalls(self):
         self._deleteFromTable("current_calls",self.calls_model,QtSql.QSqlQuery(Q1))

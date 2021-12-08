@@ -57,14 +57,13 @@ class SilicanThreadBase(QThread):
                         ET.dump(elem)
                         return elem
             except ET.ParseError as e:
-                pass
-            
+                pass            
 
 class SilicanConnectionThread(SilicanThreadBase):
     def stop(self):
-        print("stopped")
+        self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
-        os._exit(0)
+        self.running = False
         
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
@@ -72,15 +71,18 @@ class SilicanConnectionThread(SilicanThreadBase):
         self.sock.settimeout(60)
         self.login()
         self.register_req()
+        self.running = True
 
-        while True:
+        while self.running:
             try:
                 elem = self.read_frame()
             except socket.timeout as e:
                 print("Registering for Change_EV ......")
                 self.register_req()
+            except socket.error as e:
+                print("socket.error exception: ",str(e))
             except Exception as e:
-                print("SilicanConnectionThread: ",str(e))
+                print("SilicanConnectionThread exception: ",str(e))
                 self._signal.emit((config.SILICAN_ERROR,str(e)))
             
             change = elem.findall(".//Change_EV")
@@ -123,7 +125,7 @@ class SilicanConnectionThread(SilicanThreadBase):
                         sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
                         self._signal.emit((config.SILICAN_SQL,sql))
 
-
+        print("SilicanConnectionThread FINISHED")
 
 class SilicanHistoryThread(SilicanThreadBase):
 
@@ -139,6 +141,7 @@ class SilicanHistoryThread(SilicanThreadBase):
         error = elem.findall(".//Error")
         if error:
             #ET.dump(error)
+            self._signal.emit((config.SILICAN_ERROR,str(error)))
             return False
 
         change = elem.findall(".//Change_EV")
@@ -152,12 +155,11 @@ class SilicanHistoryThread(SilicanThreadBase):
             sync_type = row.find('SyncType').text
             history_call = row.find('HistoryCall')
             
-            #_rows = _rows+1
-            #self._signal.emit((config.SILICAN_PROGRESS,_rows))
-                
             if row_type == "RowEnd":
-            #    self._signal.emit((config.SILICAN_PROGRESS,850))
                 return False
+
+            if row_type == 'DelAll':
+                self._signal.emit((config.SILICAN_ERROR,"Usuń historię"))
 
             if row_type == 'Update':
                 if history_call is not None:
@@ -223,13 +225,11 @@ class SilicanHistoryThread(SilicanThreadBase):
             self.last_marker = ''
             self.request_marker(self.last_marker,2)
 
-        print("MARKER: ",self.last_marker)
-
-        run = True
-        while run:
+        self.running = True
+        while self.running:
             try:
                 elem = self.read_frame()
-                run = self.loop(elem)
+                self.running = self.loop(elem)
             except socket.timeout as e:
                 pass
             except Exception as e:
@@ -239,6 +239,11 @@ class SilicanHistoryThread(SilicanThreadBase):
                         
 
 class SilicanHistoryEventsThread(SilicanHistoryThread):
+    def stop(self):
+        self.sock.shutdown(socket.SHUT_RDWR)
+        self.sock.close()
+        self.running = False
+        
     def run(self):
         self.last_marker = ''
         try:
@@ -251,8 +256,9 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
         self.sock.settimeout(60)
         self.login()
         self.register_history_request()
+        self.running = True
         
-        while True:
+        while self.running:
             try:
                 elem = self.read_frame()
                 run = self.loop(elem)
@@ -260,5 +266,10 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 pass
                 #print("Re-register for events")
                 #self.register_history_request()
+            except socket.error as e:
+                print("socket.error exception: ",str(e))
             except Exception as e:
+                print("SilicanHistoryEventsThread exception",str(e))
                 self._signal.emit((config.SILICAN_ERROR,str(e)))
+
+        print("SilicanHistoryEventsThread FINISHED")

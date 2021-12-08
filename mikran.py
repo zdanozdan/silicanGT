@@ -118,6 +118,21 @@ class Window(QtWidgets.QMainWindow):
         self.createSettingsWigdet()
         self.start_threads()
 
+        quit = QtWidgets.QAction("Quit", self)
+        quit.triggered.connect(self.closeEvent)
+
+    def closeEvent(self,event):
+        close = QtWidgets.QMessageBox()
+        close.setText("Na pewno?")
+        close.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel)
+        close = close.exec()
+
+        if close == QtWidgets.QMessageBox.Yes:
+            self.stop_threads()
+            event.accept()            
+        else:
+            event.ignore()
+            
     def createMenuBar(self):
         usersAction = QtWidgets.QAction(QIcon('download.png'), '&Pobierz kontrahentów', self)
         usersAction.setShortcut('Ctrl+P')
@@ -167,13 +182,21 @@ class Window(QtWidgets.QMainWindow):
         silican_history_thread.start()
 
     def start_threads(self):
-        silican_thread = silican.SilicanConnectionThread(parent=self)
-        silican_thread._signal.connect(self.signal_silican)
-        silican_thread.start()
+        self.silican_thread = silican.SilicanConnectionThread(parent=self)
+        self.silican_thread._signal.connect(self.signal_silican)
+        self.silican_thread.start()
 
-        history_ev_thread = silican.SilicanHistoryEventsThread(parent=self)
-        history_ev_thread._signal.connect(self.signal_silican)
-        history_ev_thread.start()
+        self.history_ev_thread = silican.SilicanHistoryEventsThread(parent=self)
+        self.history_ev_thread._signal.connect(self.signal_silican)
+        self.history_ev_thread.start()
+
+    def stop_threads(self):
+        self.silican_thread.stop()
+        self.silican_thread.quit()
+        self.silican_thread.wait()
+        self.history_ev_thread.stop()
+        self.history_ev_thread.quit()
+        self.history_ev_thread.wait()
 
     def signal_silican(self,data):
         if data[0] == config.SILICAN_CONNECTED:
@@ -340,6 +363,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_calls.hideColumn(self.calls_columns['tel_Numer'])
         self.tableview_calls.hideColumn(self.calls_columns['pa_Nazwa'])
         self.tableview_calls.hideColumn(self.calls_columns['adr_Adres'])
+        self.tableview_calls.hideColumn(self.calls_columns['login'])
 
         self.tableview_calls.model().setHeaderData(self.calls_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_calls.model().setHeaderData(self.calls_columns['calls_state'], Qt.Horizontal, "Status")

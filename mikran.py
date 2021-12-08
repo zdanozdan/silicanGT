@@ -180,11 +180,20 @@ class Window(QtWidgets.QMainWindow):
             self.statusBar().showMessage('Centrala podłączona')
         if data[0] == config.SILICAN_ERROR:
             self.statusBar().setStyleSheet("color: red")
-            self.statusBar().showMessage('Nie udało się podłączyć do centrali')
+            self.statusBar().showMessage('Błąd %s' % data[1])
             QtWidgets.QMessageBox.critical(
                 None,
-                "Błąd podczas łączenia do centrali %s" % data[1],
-                "Błąd podczas łączenia do centrali %s" % data[1],
+                "Błąd  %s" % data[1],
+                "Błąd  %s" % data[1],
+            )
+
+        if data[0] == config.SILICAN_SUCCESS:
+            self.statusBar().setStyleSheet("color: green")
+            self.statusBar().showMessage('Sukces %s' % data[1])
+            QtWidgets.QMessageBox.information(
+                None,
+                "Sukces  %s" % data[1],
+                "Sukces  %s" % data[1],
             )
 
         if data[0] == config.SILICAN_USER_FOUND:
@@ -518,7 +527,7 @@ class MikranTableModel(QtSql.QSqlTableModel):
         self._color = QtCore.Qt.gray
 
     def data(self, index, role=None):
-       v = QtSql.QSqlTableModel.data(self, index, role);
+       v = QtSql.QSqlTableModel.data(self, index, role)
 
        if role == QtCore.Qt.BackgroundRole:
            if self._color:
@@ -541,7 +550,8 @@ class MikranTableModel(QtSql.QSqlTableModel):
                return "Nowe połączenie"
            if v == 'Connect_ST':
                self._color = QtCore.Qt.green
-               return "Odebrane u mnie (%s)" % self.config['login']
+               login = self.record(index.row()).value("login")
+               return "Odebrane u mnie (%s)" % login
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"

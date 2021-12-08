@@ -81,6 +81,7 @@ class SilicanConnectionThread(SilicanThreadBase):
                 self.register_req()
             except Exception as e:
                 print("SilicanConnectionThread: ",str(e))
+                self._signal.emit((config.SILICAN_ERROR,str(e)))
             
             change = elem.findall(".//Change_EV")
 
@@ -109,7 +110,7 @@ class SilicanConnectionThread(SilicanThreadBase):
                         self._signal.emit((config.SILICAN_USER_FOUND,user))
                         calling = user['tel_Numer']
 
-                    sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number) VALUES ('%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called)
+                    sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login) VALUES ('%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,self.config['login'])
                     self._signal.emit((config.SILICAN_SQL,sql))
 
                 if calls_state == "Connect_ST":
@@ -202,8 +203,8 @@ class SilicanHistoryThread(SilicanThreadBase):
                     else:
                         calling_number = calling
                         
-                    data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname)
-                    sql = "REPLACE INTO history_calls (marker,row_type,sync_type,hid,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % data
+                    data = (marker,row_type,sync_type,h_id,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname,self.config['login'])
+                    sql = "INSERT INTO history_calls (marker,row_type,sync_type,hid,start_time,h_type,dial_number,duration_time,attempts,calling_number,cname,login) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % data
                     self._signal.emit((config.SILICAN_HISTORY_SQL,sql))
                     self.request_marker(marker)
 
@@ -222,6 +223,8 @@ class SilicanHistoryThread(SilicanThreadBase):
             self.last_marker = ''
             self.request_marker(self.last_marker,2)
 
+        print("MARKER: ",self.last_marker)
+
         run = True
         while run:
             try:
@@ -230,9 +233,10 @@ class SilicanHistoryThread(SilicanThreadBase):
             except socket.timeout as e:
                 pass
             except Exception as e:
-                print("SilicanHistoryThread: ",str(e))
+                self._signal.emit((config.SILICAN_ERROR,str(e)))
         
-        print("FINISHED")
+        self._signal.emit((config.SILICAN_SUCCESS,"Zakończone pobieranie historii"))
+                        
 
 class SilicanHistoryEventsThread(SilicanHistoryThread):
     def run(self):
@@ -253,7 +257,8 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 elem = self.read_frame()
                 run = self.loop(elem)
             except socket.timeout as e:
-                print("Re-register for events")
-                self.register_history_request()
+                pass
+                #print("Re-register for events")
+                #self.register_history_request()
             except Exception as e:
-                print("SilicanHistoryEventsThread: ",str(e))
+                self._signal.emit((config.SILICAN_ERROR,str(e)))

@@ -33,12 +33,23 @@ def init_db():
 
     try:
         c.execute("CREATE UNIQUE INDEX idx_users_tel ON users (tel_Numer)")
+        c.execute("ALTER TABLE users ADD column login varchar(32)")
     except:
         pass
 
     c.execute("CREATE TABLE IF NOT EXISTS current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state var_char(255), calling_number varchar(255), called_number varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
 
+    try:
+        c.execute("ALTER TABLE current_calls ADD column login varchar(32)")
+    except:
+        pass
+
     c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, calling_number varchar(255), cname varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))')
+
+    try:
+        c.execute("ALTER TABLE history_calls ADD column login varchar(32)")
+    except:
+        pass
 
     conn.commit()
     conn.close()
@@ -154,6 +165,9 @@ def load_users(signal):
     insert_users(dict_rows,signal)
 
 def find_user(phonenumber):
+    if len(str(phonenumber)) < 8:
+        return None
+    
     conn = sqlite3.connect(LOCAL_DB)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()

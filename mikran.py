@@ -332,12 +332,13 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_history.hideColumn(self.history_columns['pa_Nazwa'])
         self.tableview_history.hideColumn(self.history_columns['adr_Adres'])
         self.tableview_history.hideColumn(self.history_columns['cname'])
+        self.tableview_history.hideColumn(self.history_columns['login'])
 
         self.tableview_history.model().setHeaderData(self.history_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_history.model().setHeaderData(self.history_columns['h_type'], Qt.Horizontal, "Status")
         self.tableview_history.model().setHeaderData(self.history_columns['dial_number'], Qt.Horizontal, "Linia")
         self.tableview_history.model().setHeaderData(self.history_columns['duration_time'], Qt.Horizontal, "Czas połączenia")
-        #self.tableview_history.model().setHeaderData(self.history_columns['calling_number'], Qt.Horizontal, "Numer telefonu")
+        self.tableview_history.model().setHeaderData(self.history_columns['calling_number'], Qt.Horizontal, "Numer telefonu")
         self.tableview_history.model().setHeaderData(self.history_columns['attempts'], Qt.Horizontal, "Ilość prób")
         
         self.tableview_users = QtWidgets.QTableView()

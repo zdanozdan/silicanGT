@@ -76,6 +76,7 @@ class SilicanConnectionThread(SilicanThreadBase):
         while self.running:
             try:
                 elem = self.read_frame()
+                self.parse_element(elem)
             except socket.timeout as e:
                 print("Registering for Change_EV ......")
                 self.register_req()
@@ -84,48 +85,50 @@ class SilicanConnectionThread(SilicanThreadBase):
             except Exception as e:
                 print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
                 self._signal.emit((config.SILICAN_ERROR,str(e)))
-            
-            change = elem.findall(".//Change_EV")
 
-            for row in change:
-                calls_state = row.find(".//CallsState").text
-                cr = row.find(".//CR").text
-
-                calling = "Nie wykryto numeru"
-                if row.find(".//Calling/Number") is not None:
-                    calling = row.find(".//Calling/Number").text
-                    if calling == "0":
-                        calling = "Nie wykryto numeru"
-
-                called = 0
-                if row.find(".//Called/Number") is not None:
-                    called = row.find(".//Called/Number").text
-
-                rel_cause = ''
-                if row.find(".//RelCause") is not None:
-                    rel_cause = row.find(".//RelCause").text
-                    
-                if calls_state == "NewCall_ST":
-                    self._signal.emit((config.SILICAN_CONNECTION,calling))
-                    user = db.find_user(str(calling))
-                    if user:
-                        self._signal.emit((config.SILICAN_USER_FOUND,user))
-                        calling = user['tel_Numer']
-
-                    sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login) VALUES ('%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,self.config['login'])
-                    self._signal.emit((config.SILICAN_SQL,sql))
-
-                if calls_state == "Connect_ST":
-                    sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (calls_state,cr)
-                    self._signal.emit((config.SILICAN_SQL,sql))
-
-                if calls_state == "Release_ST":
-                    self._signal.emit((config.SILICAN_RELEASE,''))
-                    if rel_cause:
-                        sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
-                        self._signal.emit((config.SILICAN_SQL,sql))
-
+        #self._signal.emit((config.SILICAN_ERROR,"Program zakończył działanie ..."))
         print("SilicanConnectionThread FINISHED")
+
+    def parse_element(self,elem):
+        change = elem.findall(".//Change_EV")
+
+        for row in change:
+            calls_state = row.find(".//CallsState").text
+            cr = row.find(".//CR").text
+
+            calling = "Nie wykryto numeru"
+            if row.find(".//Calling/Number") is not None:
+                calling = row.find(".//Calling/Number").text
+                if calling == "0":
+                    calling = "Nie wykryto numeru"
+
+            called = 0
+            if row.find(".//Called/Number") is not None:
+                called = row.find(".//Called/Number").text
+
+            rel_cause = ''
+            if row.find(".//RelCause") is not None:
+                rel_cause = row.find(".//RelCause").text
+                    
+            if calls_state == "NewCall_ST":
+                self._signal.emit((config.SILICAN_CONNECTION,calling))
+                user = db.find_user(str(calling))
+                if user:
+                    self._signal.emit((config.SILICAN_USER_FOUND,user))
+                    calling = user['tel_Numer']
+
+                sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login) VALUES ('%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,self.config['login'])
+                self._signal.emit((config.SILICAN_SQL,sql))
+
+            if calls_state == "Connect_ST":
+                sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (calls_state,cr)
+                self._signal.emit((config.SILICAN_SQL,sql))
+
+            if calls_state == "Release_ST":
+                self._signal.emit((config.SILICAN_RELEASE,''))
+                if rel_cause:
+                    sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
+                    self._signal.emit((config.SILICAN_SQL,sql))
 
 class SilicanHistoryThread(SilicanThreadBase):
 
@@ -263,9 +266,8 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 elem = self.read_frame()
                 run = self.loop(elem)
             except socket.timeout as e:
-                pass
-                #print("Re-register for events")
-                #self.register_history_request()
+                print("Re-register for events")
+                self.register_history_request()
             except socket.error as e:
                 print("socket.error exception: ","SilicanHistoryEventsThread :"+str(e))
             except Exception as e:

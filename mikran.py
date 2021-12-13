@@ -372,6 +372,9 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_calls.hideColumn(self.calls_columns['pa_Nazwa'])
         self.tableview_calls.hideColumn(self.calls_columns['adr_Adres'])
         self.tableview_calls.hideColumn(self.calls_columns['login'])
+        #TODO
+        #FIX - login pojawia się 2 krotnie z powodu Q1_LIMIT. Dict umożliwia tylko 1 klucz a mamy 2 kolumny o nazwie login i jedna (z nr 5) jest nadpisywana
+        self.tableview_calls.hideColumn(5)
 
         self.tableview_calls.model().setHeaderData(self.calls_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_calls.model().setHeaderData(self.calls_columns['calls_state'], Qt.Horizontal, "Status")

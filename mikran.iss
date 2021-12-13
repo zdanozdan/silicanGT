@@ -12,6 +12,8 @@ PrivilegesRequired=admin
 Source: "dist/mikran.exe"; DestDir: "{app}"
 Source: "yoda.png"; DestDir: "{app}"
 Source: "slack.txt"; DestDir: "{app}"
+Source: "msodbcsql_x64.msi"; DestDir: "{app}"
+Source: "VC_redist.x64.exe"; DestDir: "{app}"
 
 [Icons] 
 Name: "{commonstartup}\Mikran2s"; Filename: "{app}\mikran.exe"

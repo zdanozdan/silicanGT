@@ -7,6 +7,7 @@ AppName=Mikran2S
 AppVersion=1.0
 DefaultDirName={autopf}\mikran2s
 PrivilegesRequired=admin
+OutputBaseFilename=Mikran2S_setup
 
 [Files]
 Source: "dist/mikran.exe"; DestDir: "{app}"

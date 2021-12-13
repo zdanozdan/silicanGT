@@ -64,14 +64,17 @@ class SilicanConnectionThread(SilicanThreadBase):
         self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
         self.running = False
-        
-    def run(self):
-        self.parser = ET.XMLPullParser(['end'])
+
+    def resock(self):
         self.connect()
-        self.sock.settimeout(60)
+        self.sock.settimeout(20)
         self.login()
         self.register_req()
         self.running = True
+        
+    def run(self):
+        self.parser = ET.XMLPullParser(['end'])
+        self.resock()
 
         while self.running:
             try:
@@ -82,8 +85,14 @@ class SilicanConnectionThread(SilicanThreadBase):
                 self.register_req()
             except socket.error as e:
                 print("socket.error exception: ","SilicanConnectionThread: "+str(e))
+                self.sock.shutdown(socket.SHUT_RDWR)
+                self.sock.close()
+                self.resock()
             except Exception as e:
                 print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
+                self.sock.shutdown(socket.SHUT_RDWR)
+                self.sock.close()
+                self.resock()
                 self._signal.emit((config.SILICAN_ERROR,"SilicanConnectionThread: "+str(e)))
 
         #self._signal.emit((config.SILICAN_ERROR,"Program zakończył działanie ..."))

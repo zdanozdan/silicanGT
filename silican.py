@@ -72,7 +72,6 @@ class SilicanConnectionThread(SilicanThreadBase):
         self.sock.settimeout(60)
         self.login()
         self.register_req()
-        self.running = True
         
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
@@ -266,7 +265,6 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
         self.sock.settimeout(60)
         self.login()
         self.register_history_request()
-        self.running = True
         
     def run(self):
         self.last_marker = ''

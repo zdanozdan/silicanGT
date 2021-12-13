@@ -80,9 +80,9 @@ class SilicanConnectionThread(SilicanThreadBase):
                 print("Registering for Change_EV ......")
                 self.register_req()
             except socket.error as e:
-                print("socket.error exception: ",str(e))
+                print("socket.error exception: ","SilicanConnectionThread: "+str(e))
             except Exception as e:
-                print("SilicanConnectionThread exception: ",str(e))
+                print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
                 self._signal.emit((config.SILICAN_ERROR,str(e)))
             
             change = elem.findall(".//Change_EV")
@@ -233,7 +233,7 @@ class SilicanHistoryThread(SilicanThreadBase):
             except socket.timeout as e:
                 pass
             except Exception as e:
-                self._signal.emit((config.SILICAN_ERROR,str(e)))
+                self._signal.emit((config.SILICAN_ERROR,"SilicanHistoryThread: "+str(e)))
         
         self._signal.emit((config.SILICAN_SUCCESS,"Zakończone pobieranie historii"))
                         
@@ -267,9 +267,9 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 #print("Re-register for events")
                 #self.register_history_request()
             except socket.error as e:
-                print("socket.error exception: ",str(e))
+                print("socket.error exception: ","SilicanHistoryEventsThread :"+str(e))
             except Exception as e:
                 print("SilicanHistoryEventsThread exception",str(e))
-                self._signal.emit((config.SILICAN_ERROR,str(e)))
+                self._signal.emit((config.SILICAN_ERROR,"SilicanHistoryEventsThread: "+str(e)))
 
         print("SilicanHistoryEventsThread FINISHED")

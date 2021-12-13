@@ -33,7 +33,7 @@ class SilicanThreadBase(QThread):
         try:
             self.sock.sendall(message)
         except Exception as e:
-            self._signal.emit((config.SILICAN_ERROR,str(e)))
+            self._signal.emit((config.SILICAN_ERROR,"SendAll: "+str(e)))
 
     def login(self):
         message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.config['login'],self.config['password'])
@@ -84,7 +84,7 @@ class SilicanConnectionThread(SilicanThreadBase):
                 print("socket.error exception: ","SilicanConnectionThread: "+str(e))
             except Exception as e:
                 print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
-                self._signal.emit((config.SILICAN_ERROR,str(e)))
+                self._signal.emit((config.SILICAN_ERROR,"SilicanConnectionThread: "+str(e)))
 
         #self._signal.emit((config.SILICAN_ERROR,"Program zakończył działanie ..."))
         print("SilicanConnectionThread FINISHED")

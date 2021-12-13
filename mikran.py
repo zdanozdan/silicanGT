@@ -16,7 +16,7 @@ import datetime,timeago
 
 import db,gt,config,silican,slack
 
-VERSION_NUMBER = "1.0.0"
+VERSION_NUMBER = "1.0.1"
 
 Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
 Q1_LIMIT = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer LIMIT 1"

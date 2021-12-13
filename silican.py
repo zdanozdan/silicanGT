@@ -285,8 +285,9 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 elem = self.read_frame()
                 run = self.loop(elem)
             except socket.timeout as e:
-                print("Re-register for events")
-                self.register_history_request()
+                pass
+                #print("Re-register for events")
+                #self.register_history_request()
             except socket.error as e:
                 print("socket.error exception: ","SilicanHistoryEventsThread :"+str(e))             
                 self.resock()

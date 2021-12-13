@@ -159,6 +159,7 @@ class SilicanHistoryThread(SilicanThreadBase):
             history_call = row.find('HistoryCall')
             
             if row_type == "RowEnd":
+                self.last_marker = marker
                 return False
 
             if row_type == 'DelAll':

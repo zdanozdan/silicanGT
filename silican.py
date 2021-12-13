@@ -66,15 +66,21 @@ class SilicanConnectionThread(SilicanThreadBase):
         self.running = False
 
     def resock(self):
+        self.sock.shutdown(socket.SHUT_RDWR)
+        self.sock.close()
         self.connect()
-        self.sock.settimeout(20)
+        self.sock.settimeout(60)
         self.login()
         self.register_req()
         self.running = True
         
     def run(self):
         self.parser = ET.XMLPullParser(['end'])
-        self.resock()
+        self.connect()
+        self.sock.settimeout(60)
+        self.login()
+        self.register_req()
+        self.running = True
 
         while self.running:
             try:
@@ -85,13 +91,9 @@ class SilicanConnectionThread(SilicanThreadBase):
                 self.register_req()
             except socket.error as e:
                 print("socket.error exception: ","SilicanConnectionThread: "+str(e))
-                self.sock.shutdown(socket.SHUT_RDWR)
-                self.sock.close()
                 self.resock()
             except Exception as e:
                 print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
-                self.sock.shutdown(socket.SHUT_RDWR)
-                self.sock.close()
                 self.resock()
                 self._signal.emit((config.SILICAN_ERROR,"SilicanConnectionThread: "+str(e)))
 
@@ -256,6 +258,15 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
         self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
         self.running = False
+
+    def resock(self):
+        self.sock.shutdown(socket.SHUT_RDWR)
+        self.sock.close()
+        self.connect()
+        self.sock.settimeout(60)
+        self.login()
+        self.register_history_request()
+        self.running = True
         
     def run(self):
         self.last_marker = ''
@@ -279,9 +290,11 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 print("Re-register for events")
                 self.register_history_request()
             except socket.error as e:
-                print("socket.error exception: ","SilicanHistoryEventsThread :"+str(e))
+                print("socket.error exception: ","SilicanHistoryEventsThread :"+str(e))             
+                self.resock()
             except Exception as e:
                 print("SilicanHistoryEventsThread exception",str(e))
+                self.resock()
                 self._signal.emit((config.SILICAN_ERROR,"SilicanHistoryEventsThread: "+str(e)))
 
         print("SilicanHistoryEventsThread FINISHED")

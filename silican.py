@@ -4,7 +4,9 @@ import time,os
 import xml.etree.ElementTree as ET
 import sys,socket,time
 from datetime import datetime
-import sqlite3
+import sqlite3,logging
+
+logging.basicConfig(filename='logfile.txt', level=logging.ERROR)
 
 class SilicanThreadBase(QThread):
     _signal = pyqtSignal(tuple)
@@ -34,6 +36,7 @@ class SilicanThreadBase(QThread):
             self.sock.sendall(message)
         except Exception as e:
             self._signal.emit((config.SILICAN_ERROR,"SendAll: "+str(e)))
+            logging.error("connect() : ", exc_info=True)
 
     def login(self):
         message = '<XCTIP><Log><MakeLog><CId>12</CId><Login>%s</Login><Pass>%s</Pass></MakeLog></Log></XCTIP>' % (self.config['login'],self.config['password'])
@@ -92,12 +95,14 @@ class SilicanConnectionThread(SilicanThreadBase):
                 print("Registering for Change_EV ......")
                 self.register_req()
             except socket.error as e:
+                logging.error("SilicanConnectionThread() : ", exc_info=True)
                 print("socket.error exception: ","SilicanConnectionThread: "+str(e))
                 self.resock()
             except Exception as e:
+                logging.error("SilicanConnectionThread() : ", exc_info=True)
                 print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
                 self.resock()
-                self._signal.emit((config.SILICAN_ERROR,"SilicanConnectionThread: "+str(e)))
+                #self._signal.emit((config.SILICAN_ERROR,"SilicanConnectionThread: "+str(e)))
 
         #self._signal.emit((config.SILICAN_ERROR,"Program zakończył działanie ..."))
         print("SilicanConnectionThread FINISHED")
@@ -251,6 +256,7 @@ class SilicanHistoryThread(SilicanThreadBase):
                 pass
             except Exception as e:
                 self._signal.emit((config.SILICAN_ERROR,"SilicanHistoryThread: "+str(e)))
+                logging.error("SilicanConnectionThread() : ", exc_info=True)
         
         self._signal.emit((config.SILICAN_SUCCESS,"Zakończone pobieranie historii"))
                         
@@ -292,10 +298,12 @@ class SilicanHistoryEventsThread(SilicanHistoryThread):
                 #print("Re-register for events")
                 #self.register_history_request()
             except socket.error as e:
+                logging.error("SilicanHistoryThread() : ", exc_info=True)
                 print("socket.error exception: ","SilicanHistoryEventsThread :"+str(e))             
                 self.resock()
             except Exception as e:
                 print("SilicanHistoryEventsThread exception",str(e))
+                logging.error("SilicanHistoryThread() : ", exc_info=True)
                 self.resock()
                 self._signal.emit((config.SILICAN_ERROR,"SilicanHistoryEventsThread: "+str(e)))
 

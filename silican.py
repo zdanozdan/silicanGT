@@ -57,7 +57,10 @@ class SilicanThreadBase(QThread):
                         ET.dump(elem)
                         return elem
             except ET.ParseError as e:
-                pass            
+                pass
+            except UnicodeError as e:
+                self._signal.emit((config.SILICAN_ERROR,"read_frame: "+str(e)))
+                pass
 
 class SilicanConnectionThread(SilicanThreadBase):
     def stop(self):

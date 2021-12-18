@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-import sys,socket,time
+import sys,socket,time,re
+from sip import SIPSession
+
 from PyQt5 import QtCore
 from PyQt5.QtCore import QThread, pyqtSignal,Qt
 from PyQt5 import QtWidgets
@@ -12,9 +14,11 @@ from PyQt5 import QtSql
 import xml.etree.ElementTree as ET
 #sqlite
 import sqlite3
-import datetime,timeago
+import datetime,logging
 
 import db,gt,config,silican,slack
+
+logging.basicConfig(filename='logfile.txt', level=logging.ERROR)
 
 VERSION_NUMBER = "1.0.3"
 
@@ -30,6 +34,8 @@ Q2_FILTER = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.callin
 Q2_LIMIT = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer LIMIT 1"
 
 class Window(QtWidgets.QMainWindow):
+    _signal = pyqtSignal(tuple)
+    
     def __init__(self, parent=None):
         """Initializer."""
         super().__init__(parent)
@@ -120,9 +126,55 @@ class Window(QtWidgets.QMainWindow):
         self.createSettingsWigdet()
         self.start_threads()
 
+        self.monitorVOIP()
+
         quit = QtWidgets.QAction("Quit", self)
         quit.triggered.connect(self.closeEvent)
 
+    def self_signal(self,data):
+        if data[0] == 'SQL':
+            #print("Prepare SQL: " ,data[1])
+            self.statusBar().setStyleSheet("color: green")
+            self.statusBar().showMessage('Nowe połączenie w kolejce infolini.....')
+            query = QtSql.QSqlQuery()
+            query.exec(data[1])        
+
+    def monitorVOIP(self):
+        self._signal.connect(self.self_signal)
+
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
+        sip_session.call_ringing += self.voip_ringing
+        sip_session.send_sip_register()
+
+    def voip_ringing(self,session,data):
+        #print("------------ RINGING START")
+        #print(data)
+        #print("RINGING STOP --------------")
+        
+        try:
+            call_id = re.findall(r'Call-ID: (.*?)\r\n', data)
+            call_id = call_id[0]
+            call_to = re.findall(r'To: (.*?)\r\n', data)
+            call_to = call_to[0]
+            call_from = re.findall(r'From: (.*?)\r\n', data)
+            call_from = call_from[0]
+            calling_number = re.findall(r'sip:([0-9]+)', call_from)
+            calling_number = calling_number[0]
+            #print("RING:",call_id,call_to,call_from)
+            #print("Number calling: ",calling_number)
+        
+            user = db.find_user(str(calling_number))
+            if user:
+                calling_number = user['tel_Numer']
+
+            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from) VALUES ('%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from)
+            self._signal.emit(("SQL",sql))
+        except Exception as e:
+            self.statusBar().setStyleSheet("color: red")
+            self.statusBar().showMessage('Błąd podczs zapisu połączenia: %s' % str(e))
+        
     def closeEvent(self,event):
         close = QtWidgets.QMessageBox()
         close.setText("Na pewno?")

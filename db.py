@@ -16,9 +16,17 @@ def init_db():
     conn = sqlite3.connect(LOCAL_DB)
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS config (config_id INTEGER PRIMARY KEY, silican_address var_char(255), silican_port INTEGER, login var_char(255), password var_char(255), server var_char(255), database var_char(255), username var_char(255), passwd varchar(255), slack_token varchar(255), slack_url varchar(255))")
-    data = (0,'192.168.0.2','5529','201','mikran123','192.168.0.140','MIKRAN','mikran_com','mikran_comqwer4321','','')
+
     try:
-        c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)", data)
+        c.execute("ALTER TABLE config ADD sip_login varchar(64)")
+        c.execute("ALTER TABLE config ADD sip_password varchar(64)")
+        c.execute("ALTER TABLE config ADD sip_ip varchar(64)")
+    except:
+        pass
+    
+    data = (0,'192.168.0.2','5529','201','mikran123','192.168.0.140','MIKRAN','mikran_com','mikran_comqwer4321','','','','','')
+    try:
+        c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", data)
     except:
         pass
 
@@ -50,6 +58,9 @@ def init_db():
         c.execute("ALTER TABLE history_calls ADD column login varchar(32)")
     except:
         pass
+
+
+    c.execute("CREATE TABLE IF NOT EXISTS voip_calls ( call_id varchar(255) PRIMARY KEY, start_time TEXT, calling_number varchar(255), call_to varchar(255), call_from varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
 
     conn.commit()
     conn.close()

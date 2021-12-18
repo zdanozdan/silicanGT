@@ -142,11 +142,18 @@ class Window(QtWidgets.QMainWindow):
     def monitorVOIP(self):
         self._signal.connect(self.self_signal)
 
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
-        sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
-        sip_session.call_ringing += self.voip_ringing
-        sip_session.send_sip_register()
+        if not self.config['sip_login'] or not self.config['sip_ip'] or not self.config['sip_password']:
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Błąd",
+                "Brakuje konfiguracji infolinii, nie będzie można rejestorwać połączeń"
+            )
+        else:
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
+            sip_session.call_ringing += self.voip_ringing
+            sip_session.send_sip_register()
 
     def voip_ringing(self,session,data):
         #print("------------ RINGING START")

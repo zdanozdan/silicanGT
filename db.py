@@ -59,8 +59,12 @@ def init_db():
     except:
         pass
 
-
     c.execute("CREATE TABLE IF NOT EXISTS voip_calls ( call_id varchar(255) PRIMARY KEY, start_time TEXT, calling_number varchar(255), call_to varchar(255), call_from varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
+
+    try:
+        c.execute("ALTER TABLE voip_calls ADD column call_status INTEGER")
+    except:
+        pass
 
     conn.commit()
     conn.close()

@@ -141,6 +141,7 @@ class Window(QtWidgets.QMainWindow):
         self.createSettingsWigdet()
         self.start_threads()
 
+        self._signal.connect(self.self_signal)
         self.monitorVOIP()
 
         quit = QtWidgets.QAction("Quit", self)
@@ -156,7 +157,7 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == "INFOLINE_NUMBER":
             self.statusBar().setStyleSheet("color: green")
             self.statusBar().showMessage('Nowe połączenie w kolejce infolini : %s' % data[1])
-            self.phonenumber.setText("Oczekuje na infolini: %s" % data[1])
+            self.phonenumber.setText("Na infolinii: %s" % data[1])
             self.phonenumber.setStyleSheet("color: blue")
         if data[0] == "INFOLINE_USER":
             adres = (data[1]['adr_Adres'],data[1]['adr_Miejscowosc'],data[1]['pa_Nazwa'])
@@ -177,9 +178,17 @@ class Window(QtWidgets.QMainWindow):
             self.phonenumber.setText("Oczekuje na infolini: %s" % number)
             self.phonenumber.setStyleSheet("color: blue")
 
-    def monitorVOIP(self):
-        self._signal.connect(self.self_signal)
+        if data[0] == "INFOLINE_BAD_REQUEST":
+            self.statusBar().setStyleSheet("color: blue")
+            self.statusBar().showMessage('Błąd rejestracji infolinii')
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Błąd",
+                "Błąd infolinii: Bad request"
+            )
+            self.monitorVOIP()
 
+    def monitorVOIP(self):
         if not self.config['sip_login'] or not self.config['sip_ip'] or not self.config['sip_password']:
             QtWidgets.QMessageBox.critical(
                 None,
@@ -191,7 +200,11 @@ class Window(QtWidgets.QMainWindow):
             local_ip = socket.gethostbyname(hostname)
             sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
             sip_session.call_ringing += self.voip_ringing
+            sip_session.call_bad_request += self.voip_badrequest
             sip_session.send_sip_register()
+
+    def voip_badrequest(self,session,data):
+        self._signal.emit(("INFOLINE_BAD_REQUEST",data))
 
     def voip_ringing(self,session,data):
         #print("------------ RINGING START")
@@ -750,6 +763,13 @@ class MikranTableModel(QtSql.QSqlTableModel):
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"
+           if v == config.VOIP_NEW:
+               self._color = QtCore.Qt.yellow
+               return "Nieokreślone"
+           if v == config.VOIP_ANSWERED:
+               self._color = QtCore.Qt.green
+               return "Odebrane"
+               
            try:
                dt = datetime.datetime.strptime(v,"%m-%d-%Y, %H:%M:%S")
                v = dt.strftime("%A, %m-%d-%Y, %H:%M:%S")

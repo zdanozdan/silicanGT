@@ -34,6 +34,7 @@ Q2_FILTER = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.callin
 Q2_LIMIT = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer LIMIT 1"
 
 VOIP_QUERY = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+VOIP_QUERY_FILTER = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer where %s ORDER BY start_time DESC"
 VOIP_QUERY_LIMIT = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time DESC LIMIT 1"
 
 class Window(QtWidgets.QMainWindow):
@@ -552,9 +553,9 @@ class Window(QtWidgets.QMainWindow):
         self.tab2.setLayout(layout_history)
 
         layout_voip = QtWidgets.QVBoxLayout()
-        #line_edit = QtWidgets.QLineEdit()
-        #line_edit.textChanged.connect(self.filter_users)
-        #layout.addWidget(line_edit)
+        line_edit_voip = QtWidgets.QLineEdit()
+        line_edit_voip.textChanged.connect(self.filter_voip)
+        layout_voip.addWidget(line_edit_voip)
         layout_voip.addWidget(self.tableview_voip)
         self.tab4.setLayout(layout_voip)
         
@@ -619,6 +620,16 @@ class Window(QtWidgets.QMainWindow):
 
     def settings(self):        
         self.settings_widget.show()
+
+    def filter_voip(self,data):
+        if data:
+            f = " (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')"
+            sql = VOIP_QUERY_FILTER % f
+            self.voip_model.setQuery(QtSql.QSqlQuery(sql))
+        else:
+            self.voip_model.setQuery(QtSql.QSqlQuery(VOIP_QUERY))
+
+        self.history_model.select()
 
     def filter_history(self,data):
         if data:

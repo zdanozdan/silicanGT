@@ -27,6 +27,7 @@ class SIPSession:
         self.tag = str(random.randint(0,2**31))
         self.call_accepted = EventHook()
         self.call_rejected = EventHook()
+        self.call_bad_request = EventHook()
         self.call_ended = EventHook()
         self.call_error = EventHook()
         self.call_ringing = EventHook()
@@ -272,6 +273,10 @@ class SIPSession:
 
                     _logger.error(reply)
                     self.sipsocket.sendto(reply.encode(), addr)
+                elif data.split("\r\n")[0] == "SIP/2.0 400 Bad Request":
+                    self.call_bad_request.fire(self, data)
+                    stage = "BadRequest"
+                    return False
                 elif data.split("\r\n")[0] == "SIP/2.0 403 Forbidden":
                     #Likely means call was rejected
                     self.call_rejected.fire(self, data)
@@ -327,6 +332,9 @@ class SIPSession:
                 elif data.startswith("BYE"):
                     #Do stuff when the call is ended by client
                     self.call_ended.fire(self, data)
+                    print("ENDED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                    print(data)
+                    print("ENDED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
                     stage = "BYE"
                     return True
                 elif data.split("\r\n")[0] == "SIP/2.0 200 OK":

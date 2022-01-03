@@ -34,6 +34,7 @@ Q2_FILTER = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.callin
 Q2_LIMIT = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer LIMIT 1"
 
 VOIP_QUERY = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+VOIP_QUERY_FILTER = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer where %s ORDER BY start_time DESC"
 VOIP_QUERY_LIMIT = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time DESC LIMIT 1"
 
 class Window(QtWidgets.QMainWindow):
@@ -140,6 +141,7 @@ class Window(QtWidgets.QMainWindow):
         self.createSettingsWigdet()
         self.start_threads()
 
+        self._signal.connect(self.self_signal)
         self.monitorVOIP()
 
         quit = QtWidgets.QAction("Quit", self)
@@ -176,9 +178,17 @@ class Window(QtWidgets.QMainWindow):
             self.phonenumber.setText("Oczekuje na infolini: %s" % number)
             self.phonenumber.setStyleSheet("color: blue")
 
-    def monitorVOIP(self):
-        self._signal.connect(self.self_signal)
+        if data[0] == "INFOLINE_BAD_REQUEST":
+            self.statusBar().setStyleSheet("color: blue")
+            self.statusBar().showMessage('Błąd rejestracji infolinii')
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Błąd",
+                "Błąd infolinii: Bad request"
+            )
+            self.monitorVOIP()
 
+    def monitorVOIP(self):
         if not self.config['sip_login'] or not self.config['sip_ip'] or not self.config['sip_password']:
             QtWidgets.QMessageBox.critical(
                 None,
@@ -190,7 +200,11 @@ class Window(QtWidgets.QMainWindow):
             local_ip = socket.gethostbyname(hostname)
             sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
             sip_session.call_ringing += self.voip_ringing
+            sip_session.call_bad_request += self.voip_badrequest
             sip_session.send_sip_register()
+
+    def voip_badrequest(self,session,data):
+        self._signal.emit(("INFOLINE_BAD_REQUEST",data))
 
     def voip_ringing(self,session,data):
         #print("------------ RINGING START")
@@ -552,9 +566,9 @@ class Window(QtWidgets.QMainWindow):
         self.tab2.setLayout(layout_history)
 
         layout_voip = QtWidgets.QVBoxLayout()
-        #line_edit = QtWidgets.QLineEdit()
-        #line_edit.textChanged.connect(self.filter_users)
-        #layout.addWidget(line_edit)
+        line_edit_voip = QtWidgets.QLineEdit()
+        line_edit_voip.textChanged.connect(self.filter_voip)
+        layout_voip.addWidget(line_edit_voip)
         layout_voip.addWidget(self.tableview_voip)
         self.tab4.setLayout(layout_voip)
         
@@ -619,6 +633,16 @@ class Window(QtWidgets.QMainWindow):
 
     def settings(self):        
         self.settings_widget.show()
+
+    def filter_voip(self,data):
+        if data:
+            f = " (tel_Numer like '%"+data+"%' OR pa_Nazwa like '%"+data+"%' OR adr_NazwaPelna like '%"+data+"%' OR adr_NIP like '%"+data+"%' OR adr_Miejscowosc like '%"+data+"%' OR adr_Ulica like '%"+data+"%')"
+            sql = VOIP_QUERY_FILTER % f
+            self.voip_model.setQuery(QtSql.QSqlQuery(sql))
+        else:
+            self.voip_model.setQuery(QtSql.QSqlQuery(VOIP_QUERY))
+
+        self.history_model.select()
 
     def filter_history(self,data):
         if data:
@@ -739,6 +763,13 @@ class MikranTableModel(QtSql.QSqlTableModel):
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"
+           if v == config.VOIP_NEW:
+               self._color = QtCore.Qt.yellow
+               return "Nieokreślone"
+           if v == config.VOIP_ANSWERED:
+               self._color = QtCore.Qt.green
+               return "Odebrane"
+               
            try:
                dt = datetime.datetime.strptime(v,"%m-%d-%Y, %H:%M:%S")
                v = dt.strftime("%A, %m-%d-%Y, %H:%M:%S")

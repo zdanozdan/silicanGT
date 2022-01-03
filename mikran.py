@@ -22,10 +22,10 @@ logging.basicConfig(filename='logfile.txt', level=logging.ERROR)
 
 VERSION_NUMBER = "1.4"
 
-Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
+Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time_unix DESC"
 Q1_LIMIT = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer LIMIT 1"
 
-Q1_FILTER = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer WHERE %s ORDER BY start_time DESC"
+Q1_FILTER = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer WHERE %s ORDER BY start_time_unix DESC"
 
 Q2 = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
 
@@ -33,9 +33,9 @@ Q2_FILTER = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.callin
 
 Q2_LIMIT = "SELECT * FROM history_calls LEFT JOIN users ON history_calls.calling_number = users.tel_Numer LIMIT 1"
 
-VOIP_QUERY = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time DESC"
-VOIP_QUERY_FILTER = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer where %s ORDER BY start_time DESC"
-VOIP_QUERY_LIMIT = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time DESC LIMIT 1"
+VOIP_QUERY = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time_unix DESC"
+VOIP_QUERY_FILTER = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer where %s ORDER BY start_time_unix DESC"
+VOIP_QUERY_LIMIT = "SELECT * FROM voip_calls LEFT JOIN users ON voip_calls.calling_number = users.tel_Numer ORDER BY start_time_unix DESC LIMIT 1"
 
 class Window(QtWidgets.QMainWindow):
     _signal = pyqtSignal(tuple)
@@ -51,6 +51,9 @@ class Window(QtWidgets.QMainWindow):
         self._calling_number = "..."
         db.init_db()
         self.config = db.load_config()
+
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.infoline_timer)
 
         self.voip_calls_columns = []
         try:
@@ -147,6 +150,12 @@ class Window(QtWidgets.QMainWindow):
         quit = QtWidgets.QAction("Quit", self)
         quit.triggered.connect(self.closeEvent)
 
+    def infoline_timer(self):
+        self.tabs.tabBar().setTabTextColor(3,QtCore.Qt.gray)
+        icon = QtGui.QIcon()
+        self.tabs.tabBar().setTabIcon(3,icon)
+        self.timer.stop()
+
     def self_signal(self,data):
         if data[0] == 'SQL':
             #print("Prepare SQL: " ,data[1])            
@@ -156,9 +165,16 @@ class Window(QtWidgets.QMainWindow):
             self.voip_model.select()
         if data[0] == "INFOLINE_NUMBER":
             self.statusBar().setStyleSheet("color: green")
-            self.statusBar().showMessage('Nowe połączenie w kolejce infolini : %s' % data[1])
+            self.statusBar().showMessage('Infolinia : %s' % data[1])
             #self.phonenumber.setText("Oczekuje na infolini: %s" % data[1])
             #self.phonenumber.setStyleSheet("color: blue")
+
+            self.tabs.tabBar().setTabTextColor(3,QtCore.Qt.blue)
+            icon = QtGui.QIcon('yoda.png')
+            self.tabs.tabBar().setTabIcon(3,icon)
+            self.tabs.tabBar().setTabText(3,"Infolinia: (%s)" % data[1])
+            self.timer.start(10000)
+            
         if data[0] == "INFOLINE_USER":
             adres = (data[1]['adr_Adres'],data[1]['adr_Miejscowosc'],data[1]['pa_Nazwa'])
             adres = ",".join(adres)
@@ -167,16 +183,22 @@ class Window(QtWidgets.QMainWindow):
             number = data[1]['tel_Numer']
 
             self.statusBar().setStyleSheet("color: green")
-            self.statusBar().showMessage('Pierwsze połączenie w kolejce infolini : %s (%s, %s, NIP: %s)' % (number,nazwa,adres,nip))
+            self.statusBar().showMessage('Infolinia : %s (%s, %s, NIP: %s)' % (number,nazwa,adres,nip))
 
-            self.firma.setText(nazwa)
-            self.firma.setStyleSheet("color: blue")
-            self.adres.setText(adres)
-            self.adres.setStyleSheet("color: blue")
-            self.nip.setText(nip)
-            self.nip.setStyleSheet("color: blue")
-            self.phonenumber.setText("Oczekuje na infolini: %s" % number)
-            self.phonenumber.setStyleSheet("color: blue")
+            self.tabs.tabBar().setTabTextColor(3,QtCore.Qt.blue)
+            icon = QtGui.QIcon('yoda.png')
+            self.tabs.tabBar().setTabIcon(3,icon)
+            self.tabs.tabBar().setTabText(3,"Infolinia: (%s)" % number)
+            self.timer.start(10000)
+
+            #self.firma.setText(nazwa)
+            #self.firma.setStyleSheet("color: blue")
+            #self.adres.setText(adres)
+            #self.adres.setStyleSheet("color: blue")
+            #self.nip.setText(nip)
+            #self.nip.setStyleSheet("color: blue")
+            #self.phonenumber.setText("Oczekuje na infolini: %s" % number)
+            #self.phonenumber.setStyleSheet("color: blue")
 
         if data[0] == "INFOLINE_BAD_REQUEST":
             self.statusBar().setStyleSheet("color: blue")
@@ -230,7 +252,9 @@ class Window(QtWidgets.QMainWindow):
             else:
                 self._signal.emit(("INFOLINE_NUMBER",calling_number))
 
-            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_status) VALUES ('%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,config.VOIP_NEW)
+            unix_time = int(time.time())
+            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_status,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,config.VOIP_NEW,unix_time)
+                        
             self._signal.emit(("SQL",sql))
         except Exception as e:
             self.statusBar().setStyleSheet("color: red")
@@ -362,6 +386,7 @@ class Window(QtWidgets.QMainWindow):
             self.firma.setStyleSheet("color: gray")
             self.adres.setStyleSheet("color: gray")
             self.nip.setStyleSheet("color: gray")
+            self.statusBar().showMessage("Zakończono: %s" % self._calling_number)
 
         if data[0] == config.SILICAN_SQL:
             query = QtSql.QSqlQuery()
@@ -492,6 +517,7 @@ class Window(QtWidgets.QMainWindow):
         #TODO
         #FIX - login pojawia się 2 krotnie z powodu Q1_LIMIT. Dict umożliwia tylko 1 klucz a mamy 2 kolumny o nazwie login i jedna (z nr 5) jest nadpisywana
         self.tableview_calls.hideColumn(5)
+        self.tableview_calls.hideColumn(self.calls_columns['start_time_unix'])
 
         self.tableview_calls.model().setHeaderData(self.calls_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_calls.model().setHeaderData(self.calls_columns['calls_state'], Qt.Horizontal, "Status")
@@ -523,6 +549,8 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_voip.hideColumn(self.voip_columns['tel_Numer'])
         self.tableview_voip.hideColumn(self.voip_columns['pa_Nazwa'])
         self.tableview_voip.hideColumn(self.voip_columns['adr_Adres'])
+        self.tableview_voip.hideColumn(self.voip_columns['start_time_unix'])
+        self.tableview_voip.hideColumn(self.voip_columns['call_status'])
 
         self.tableview_voip.model().setHeaderData(self.voip_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_voip.model().setHeaderData(self.voip_columns['calling_number'], Qt.Horizontal, "Nr telefonu")
@@ -541,7 +569,8 @@ class Window(QtWidgets.QMainWindow):
         self.tabs.addTab(self.tab1,"Bieżące połączenia ( wew "+self.config['login']+" )")
         self.tabs.addTab(self.tab2,"Historyczne dla ( wew "+self.config['login']+" )")
         self.tabs.addTab(self.tab3,"Kontakty")
-        self.tabs.addTab(self.tab4,"Infolinia (61 8475858)")
+        self.tabs.addTab(self.tab4,"Infolinia")
+        
         vbox.addWidget(self.tabs)
 
         layout = QtWidgets.QVBoxLayout()
@@ -763,12 +792,12 @@ class MikranTableModel(QtSql.QSqlTableModel):
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"
-           if v == config.VOIP_NEW:
-               self._color = QtCore.Qt.yellow
-               return "Nieokreślone"
-           if v == config.VOIP_ANSWERED:
-               self._color = QtCore.Qt.green
-               return "Odebrane"
+           #if v == config.VOIP_NEW:
+           #    self._color = QtCore.Qt.yellow
+           #    return "Nieokreślone"
+           #if v == config.VOIP_ANSWERED:
+           #    self._color = QtCore.Qt.green
+           #    return "Odebrane"
                
            try:
                dt = datetime.datetime.strptime(v,"%m-%d-%Y, %H:%M:%S")

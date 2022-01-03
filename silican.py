@@ -135,7 +135,8 @@ class SilicanConnectionThread(SilicanThreadBase):
                     self._signal.emit((config.SILICAN_USER_FOUND,user))
                     calling = user['tel_Numer']
 
-                sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login) VALUES ('%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,self.config['login'])
+                unix_time = int(time.time())
+                sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,self.config['login'],unix_time)
                 self._signal.emit((config.SILICAN_SQL,sql))
 
             if calls_state == "Connect_ST":
@@ -187,8 +188,6 @@ class SilicanHistoryThread(SilicanThreadBase):
                 if history_call is not None:
                     start_time = history_call.find('StartTime').text
                     h_id = history_call.find('HId').text
-
-                    dt = datetime.datetime.strptime(start_time,"%Y-%m-%d %H:%M:%S")
 
                     attempts = 0
                     if history_call.find('Attempts') is not None:

@@ -155,8 +155,8 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == "INFOLINE_NUMBER":
             self.statusBar().setStyleSheet("color: green")
             self.statusBar().showMessage('Nowe połączenie w kolejce infolini : %s' % data[1])
-            self.phonenumber.setText("Oczekuje na infolini: %s" % data[1])
-            self.phonenumber.setStyleSheet("color: blue")
+            #self.phonenumber.setText("Oczekuje na infolini: %s" % data[1])
+            #self.phonenumber.setStyleSheet("color: blue")
         if data[0] == "INFOLINE_USER":
             adres = (data[1]['adr_Adres'],data[1]['adr_Miejscowosc'],data[1]['pa_Nazwa'])
             adres = ",".join(adres)

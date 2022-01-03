@@ -188,6 +188,8 @@ class SilicanHistoryThread(SilicanThreadBase):
                     start_time = history_call.find('StartTime').text
                     h_id = history_call.find('HId').text
 
+                    dt = datetime.datetime.strptime(start_time,"%Y-%m-%d %H:%M:%S")
+
                     attempts = 0
                     if history_call.find('Attempts') is not None:
                         attempts = history_call.find('Attempts').text

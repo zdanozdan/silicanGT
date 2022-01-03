@@ -52,6 +52,11 @@ def init_db():
     except:
         pass
 
+    try:
+        c.execute("ALTER TABLE current_calls ADD column start_time_unix INTEGER")
+    except:
+        pass
+
     c.execute('CREATE TABLE IF NOT EXISTS history_calls (marker varchar(255), row_type var_char(32), sync_type varchar(255), hid INTEGER PRIMARY KEY, start_time TEXT, h_type  varchar(256), dial_number INTEGER, duration_time INTEGER, attempts INTEGER, calling_number varchar(255), cname varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))')
 
     try:
@@ -59,10 +64,20 @@ def init_db():
     except:
         pass
 
+    try:
+        c.execute("ALTER TABLE history_calls ADD column start_time_unix INTEGER")
+    except:
+        pass
+
     c.execute("CREATE TABLE IF NOT EXISTS voip_calls ( call_id varchar(255) PRIMARY KEY, start_time TEXT, calling_number varchar(255), call_to varchar(255), call_from varchar(255), FOREIGN KEY(calling_number) REFERENCES users(tel_Numer))")
 
     try:
         c.execute("ALTER TABLE voip_calls ADD column call_status INTEGER")
+    except:
+        pass
+
+    try:
+        c.execute("ALTER TABLE voip_calls ADD column start_time_unix INTEGER")
     except:
         pass
 

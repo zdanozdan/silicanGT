@@ -202,12 +202,12 @@ class Window(QtWidgets.QMainWindow):
 
         if data[0] == "INFOLINE_BAD_REQUEST":
             self.statusBar().setStyleSheet("color: blue")
-            self.statusBar().showMessage('Błąd rejestracji infolinii')
-            QtWidgets.QMessageBox.critical(
-                None,
-                "Błąd",
-                "Błąd infolinii: Bad request"
-            )
+            self.statusBar().showMessage('Błąd rejestracji infolinii. Powtórne logowanie')
+            #QtWidgets.QMessageBox.critical(
+            #    None,
+            #    "Błąd",
+            #    "Błąd infolinii: Bad request"
+            #)
             self.monitorVOIP()
 
     def monitorVOIP(self):

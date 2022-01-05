@@ -1,12 +1,14 @@
+from sip import SIPSession
 import db,config
 import time,os
 import xml.etree.ElementTree as ET
-import sys,socket,time
-from datetime import datetime
+import sys,socket,time,re,datetime
 import sqlite3,logging
-from sip import SIPSession
+import db_service
 
 logging.basicConfig(filename='service_log.txt', level=logging.ERROR)
+
+VOIP_NEW = 0
 
 class SilicanThreadBase:
     
@@ -48,8 +50,9 @@ class SilicanThreadBase:
                         return elem
             except ET.ParseError as e:
                 pass
-class SipLoger:
-    def register(self):
+class SipListener:
+    def start(self):
+        self.config = db_service.load_config()
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
         sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
@@ -58,11 +61,36 @@ class SipLoger:
         sip_session.send_sip_register()
         
     def voip_badrequest(self,session,data):
-        pass
+        self.start()
 
     def voip_ringing(self,session,data):
-        pass
+        print("------------ RINGING START")
+        print(data)
+        print("RINGING STOP --------------")
+        
+        try:
+            call_id = re.findall(r'Call-ID: (.*?)\r\n', data)
+            call_id = call_id[0]
+            call_to = re.findall(r'To: (.*?)\r\n', data)
+            call_to = call_to[0]
+            call_from = re.findall(r'From: (.*?)\r\n', data)
+            call_from = call_from[0]
+            calling_number = re.findall(r'sip:([0-9]+)', call_from)
+            calling_number = calling_number[0]
+            print("Number calling: ",calling_number)
+        
+            unix_time = int(time.time())
+            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_received,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,0,unix_time)
+
+            print(sql)
+            db_service.execute(sql)
+                        
+        except Exception as e:
+            print(str(e))
 
 if __name__ == "__main__":
-    app = SilicanHistoryThread()
-    app.run()
+    db_service.init_db()
+    listener = SipListener()
+    listener.start()
+    #app = SilicanHistoryThread()
+    #app.run()

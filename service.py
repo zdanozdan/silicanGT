@@ -10,15 +10,10 @@ logging.basicConfig(filename='service_log.txt', level=logging.ERROR)
 
 class SilicanListener:
 
-    def start(self):
-        self.config = db_service.load_config()
-        print(self.config)
-        logins = self.config['login'].split(",")
-        password = self.config['password']
-        for login in logins:
-            silican_starter = threading.Thread(target=self.silican_listener, args=(login,password))
-            silican_starter.start()
-            time.sleep(1)
+    def start(self,login,password,config):
+        self.config = config
+        silican_starter = threading.Thread(target=self.silican_listener, args=(login,password))
+        silican_starter.start()
     
     def connect(self):
         self.config = db_service.load_config()
@@ -70,7 +65,7 @@ class SilicanListener:
         self.register_req()
 
     def silican_listener(self,login,password):
-        print("STARTED:",login)
+        print("Silican thread started for login: :",login)
         self.parser = ET.XMLPullParser(['end'])
         self.connect()
         self.sock.settimeout(60)
@@ -119,7 +114,7 @@ class SilicanListener:
                     
             if calls_state == "NewCall_ST":
                 unix_time = int(time.time())
-                sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,'-',unix_time)
+                sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,'-',unix_time)
 
                 print(sql)
                 db_service.execute(sql)
@@ -178,8 +173,14 @@ class SipListener:
 if __name__ == "__main__":
     db_service.init_db()
 
-    #listener = SipListener()
-    #listener.start()
+    listener = SipListener()
+    listener.start()
 
-    silican = SilicanListener()
-    silican.start()
+    config = db_service.load_config()
+    logins = config['login'].split(",")
+    #logins = ['201','202']
+    password = config['password']
+    for login in logins:
+        listener = SilicanListener()
+        listener.start(login,password,config)
+        time.sleep(1)

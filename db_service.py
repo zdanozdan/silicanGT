@@ -18,6 +18,12 @@ def init_db():
     except:
         pass
 
+    try:
+        cursor.execute("CREATE TABLE current_calls ( cr INTEGER PRIMARY KEY, start_time TEXT, calls_state varchar(255), calling_number varchar(255), called_number varchar(255), login varchar(32),start_time_unix INTEGER)")
+        cursor.commit()
+    except:
+        pass
+
     cnxn.close()
 
 def load_config():

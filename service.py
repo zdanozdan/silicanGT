@@ -11,12 +11,13 @@ logging.basicConfig(filename='service_log.txt', level=logging.ERROR)
 class SilicanListener:
 
     def start(self,login,password,config):
+        self.cursor = db_service.init_db()
         self.config = config
         silican_starter = threading.Thread(target=self.silican_listener, args=(login,password))
         silican_starter.start()
     
     def connect(self):
-        self.config = db_service.load_config()
+        self.config = db_service.load_config(self.cursor)
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.settimeout(10)
@@ -56,12 +57,12 @@ class SilicanListener:
             except ET.ParseError as e:
                 pass
 
-    def resock(self):
+    def resock(self,login,password):
         self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
         self.connect()
         self.sock.settimeout(60)
-        self.login()
+        self.login(login,password)
         self.register_req()
 
     def silican_listener(self,login,password):
@@ -85,11 +86,11 @@ class SilicanListener:
             except socket.error as e:
                 logging.error("SilicanConnectionThread() : ", exc_info=True)
                 print("socket.error exception: ","SilicanConnectionThread: "+str(e))
-                self.resock()
+                self.resock(login,password)
             except Exception as e:
                 logging.error("SilicanConnectionThread() : ", exc_info=True)
                 print("SilicanConnectionThread exception: ","SilicanConnectionThread: "+str(e))
-                self.resock()
+                self.resock(login,password)
 
     def parse_element(self,elem):
         change = elem.findall(".//Change_EV")
@@ -97,6 +98,14 @@ class SilicanListener:
         for row in change:
             calls_state = row.find(".//CallsState").text
             cr = row.find(".//CR").text
+
+            #<Colp>
+            #<Number>212</Number>
+            #<Comment>Abonent 212 Szymon</Comment>
+            #</Colp>
+            colp = ""
+            if row.find(".//Colp/Number") is not None:
+                colp = row.find(".//Colp/Number").text
 
             calling = "Nie wykryto numeru"
             if row.find(".//Calling/Number") is not None:
@@ -114,16 +123,24 @@ class SilicanListener:
                     
             if calls_state == "NewCall_ST":
                 unix_time = int(time.time())
-                sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,'-',unix_time)
+                #sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix,colp,attempts) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,'-',unix_time,colp,1)
+
+                #try:
+                calling = calling.lstrip('0')
+                sql = "UPDATE voip_calls SET call_received='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC)" % (self._login,calling)
 
                 print(sql)
-                db_service.execute(sql)
+                db_service.execute(self.cursor,sql)
+#except:
+ #                   sql = "UPDATE current_calls SET calls_state='%s',colp='%s',start_time='%s',start_time_unix='%s',attempts=attempts+1 WHERE cr='%s'" % (calls_state,colp,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),unix_time,cr)
+ #                   print(sql)
+#                    db_service.execute(self.cursor,sql)
 
             if calls_state == "Connect_ST":
-                sql = "UPDATE current_calls SET calls_state = '%s', login = '%s'  WHERE cr = '%s'" % (calls_state,self._login,cr)
+                sql = "UPDATE current_calls SET calls_state = '%s', login = '%s',attempts=attempts+1 WHERE cr = '%s'" % (calls_state,self._login,cr)
 
-                print(sql)
-                db_service.execute(sql)
+                #print(sql)
+                #db_service.execute(self.cursor,sql)
 
             #if calls_state == "Release_ST":
             #    self._signal.emit((config.SILICAN_RELEASE,''))
@@ -134,7 +151,8 @@ class SilicanListener:
             
 class SipListener:
     def start(self):
-        self.config = db_service.load_config()
+        self.cursor = db_service.init_db()
+        self.config = db_service.load_config(self.cursor)
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
         sip_session = SIPSession(local_ip,self.config['sip_login'],self.config['sip_ip'],self.config['sip_password'],account_port=5060,display_name="mikran")
@@ -165,18 +183,19 @@ class SipListener:
             sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_received,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,0,unix_time)
 
             print(sql)
-            db_service.execute(sql)
+            db_service.execute(self.cursor,sql)
                         
         except Exception as e:
             print(str(e))
 
 if __name__ == "__main__":
-    db_service.init_db()
+    cursor = db_service.init_db()
+    db_service.init_tables(cursor)
 
     listener = SipListener()
     listener.start()
 
-    config = db_service.load_config()
+    config = db_service.load_config(cursor)
     logins = config['login'].split(",")
     #logins = ['201','202']
     password = config['password']

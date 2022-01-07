@@ -129,26 +129,45 @@ class SilicanListener:
                 calling = calling.lstrip('0')
                 sql = "UPDATE voip_calls SET call_received='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC)" % (self._login,calling)
 
-                print(sql)
-                db_service.execute(self.cursor,sql)
+                #print(sql)
+                #db_service.execute(self.cursor,sql)
 #except:
  #                   sql = "UPDATE current_calls SET calls_state='%s',colp='%s',start_time='%s',start_time_unix='%s',attempts=attempts+1 WHERE cr='%s'" % (calls_state,colp,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),unix_time,cr)
  #                   print(sql)
 #                    db_service.execute(self.cursor,sql)
 
+#<Change_EV>
+#      <Src_Id>1008</Src_Id>
+#      <Dst_Id>1008</Dst_Id>
+#      <CallsState>Connect_ST</CallsState>
+#      <CR>4118</CR>
+#      <Calling>
+#        <TerminalType>SuboIP</TerminalType>
+#        <Number>2160</Number>
+#        <Comment>Abonent 2160</Comment>
+#        <Group>Subiekt</Group>
+#      </Calling>
+#      External number
+#      <Calling>
+#        <Number>0784021970</Number>
+#        <AreaCode>GSM</AreaCode>
+#      </Calling>
+#      <Colp>
+#        <Number>208</Number>
+#        <Comment>Abonent 208 Pawel</Comment>
+#      </Colp>
+#      <Called>
+#        <Number>208</Number>
+#        <Comment>Abonent 208 Pawel</Comment>
+#      </Called>
+#    </Change_EV>
+
             if calls_state == "Connect_ST":
-                sql = "UPDATE current_calls SET calls_state = '%s', login = '%s',attempts=attempts+1 WHERE cr = '%s'" % (calls_state,self._login,cr)
+                calling = calling.lstrip('0')
+                sql = "UPDATE voip_calls SET call_received='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC)" % (self._login,calling)
+                print(sql)
+                db_service.execute(self.cursor,sql)
 
-                #print(sql)
-                #db_service.execute(self.cursor,sql)
-
-            #if calls_state == "Release_ST":
-            #    self._signal.emit((config.SILICAN_RELEASE,''))
-            #    if rel_cause:
-            #        sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
-            #        self._signal.emit((config.SILICAN_SQL,sql))
-
-            
 class SipListener:
     def start(self):
         self.cursor = db_service.init_db()

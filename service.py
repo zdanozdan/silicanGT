@@ -123,19 +123,12 @@ class SilicanListener:
                     
             if calls_state == "NewCall_ST":
                 unix_time = int(time.time())
-                #sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix,colp,attempts) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,'-',unix_time,colp,1)
-
-                #try:
                 calling = calling.lstrip('0')
-                sql = "UPDATE voip_calls SET call_received='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC)" % (self._login,calling)
 
-                #print(sql)
-                #db_service.execute(self.cursor,sql)
-#except:
- #                   sql = "UPDATE current_calls SET calls_state='%s',colp='%s',start_time='%s',start_time_unix='%s',attempts=attempts+1 WHERE cr='%s'" % (calls_state,colp,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),unix_time,cr)
- #                   print(sql)
-#                    db_service.execute(self.cursor,sql)
+                sql = "UPDATE voip_calls SET silican_ringing = CASE WHEN silican_ringing IS NULL THEN '%s' ELSE silican_ringing+',%s' END WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC) " % (self._login,self._login,calling)
 
+                print(sql)
+                db_service.execute(self.cursor,sql)
 #<Change_EV>
 #      <Src_Id>1008</Src_Id>
 #      <Dst_Id>1008</Dst_Id>

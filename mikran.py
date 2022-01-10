@@ -394,6 +394,12 @@ class Window(QtWidgets.QMainWindow):
             self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
             self.calls_model.select()
 
+        if data[0] == config.VOIP_SQL:
+            query = QtSql.QSqlQuery()
+            query.exec(data[1])
+            self.voip_model.setQuery(QtSql.QSqlQuery(VOIP_QUERY))
+            self.voip_model.select()
+
         if data[0] == config.SILICAN_PROGRESS:            
             self.pbar.setValue(int(data[1]))
 

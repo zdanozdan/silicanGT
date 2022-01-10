@@ -18,7 +18,7 @@ def init_tables(cursor):
         pass
 
     try:
-        cursor.execute("CREATE TABLE voip_calls ( call_id varchar(255), start_time TEXT, calling_number varchar(255), call_to varchar(255), call_from varchar(255), call_received varchar(64), start_time_unix INTEGER)")
+        cursor.execute("CREATE TABLE voip_calls ( call_id varchar(255), start_time TEXT, calling_number varchar(255), call_to varchar(255), call_from varchar(255), call_received varchar(64), start_time_unix INTEGER, silican_ringing varchar(255))")
         cursor.commit()
     except:
         pass

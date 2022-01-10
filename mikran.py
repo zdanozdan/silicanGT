@@ -557,6 +557,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_voip.hideColumn(self.voip_columns['adr_Adres'])
         self.tableview_voip.hideColumn(self.voip_columns['start_time_unix'])
         self.tableview_voip.hideColumn(self.voip_columns['call_status'])
+        self.tableview_voip.hideColumn(self.voip_columns['cr'])
 
         self.tableview_voip.model().setHeaderData(self.voip_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_voip.model().setHeaderData(self.voip_columns['calling_number'], Qt.Horizontal, "Nr telefonu")

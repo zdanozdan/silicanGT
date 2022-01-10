@@ -78,6 +78,10 @@ def init_db():
 
     try:
         c.execute("ALTER TABLE voip_calls ADD column cr INTEGER")
+    except:
+        pass
+
+    try:
         c.execute("ALTER TABLE voip_calls ADD column calls_state varchar(255)")
     except:
         pass

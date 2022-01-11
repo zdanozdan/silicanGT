@@ -139,15 +139,23 @@ class SilicanConnectionThread(SilicanThreadBase):
                 sql = "INSERT INTO current_calls (cr,start_time,calls_state,calling_number,called_number,login,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')"  % (cr,datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calls_state,calling,called,self.config['login'],unix_time)
                 self._signal.emit((config.SILICAN_SQL,sql))
 
+                sql = "UPDATE voip_calls SET cr = '%s',calls_state = '%s' WHERE call_id=(SELECT call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC LIMIT 1) " % (cr,calls_state,calling)
+
+                self._signal.emit((config.VOIP_SQL,sql))
+
             if calls_state == "Connect_ST":
                 sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (calls_state,cr)
                 self._signal.emit((config.SILICAN_SQL,sql))
+                sql = "UPDATE voip_calls SET calls_state = '%s' WHERE cr = '%s'" % (calls_state,cr)
+                self._signal.emit((config.VOIP_SQL,sql))
 
             if calls_state == "Release_ST":
                 self._signal.emit((config.SILICAN_RELEASE,''))
                 if rel_cause:
                     sql = "UPDATE current_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
                     self._signal.emit((config.SILICAN_SQL,sql))
+                    sql = "UPDATE voip_calls SET calls_state = '%s' WHERE cr = '%s'" % (rel_cause,cr)
+                    self._signal.emit((config.VOIP_SQL,sql))
 
 class SilicanHistoryThread(SilicanThreadBase):
 

@@ -394,6 +394,12 @@ class Window(QtWidgets.QMainWindow):
             self.calls_model.setQuery(QtSql.QSqlQuery(Q1))
             self.calls_model.select()
 
+        if data[0] == config.VOIP_SQL:
+            query = QtSql.QSqlQuery()
+            query.exec(data[1])
+            self.voip_model.setQuery(QtSql.QSqlQuery(VOIP_QUERY))
+            self.voip_model.select()
+
         if data[0] == config.SILICAN_PROGRESS:            
             self.pbar.setValue(int(data[1]))
 
@@ -551,6 +557,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_voip.hideColumn(self.voip_columns['adr_Adres'])
         self.tableview_voip.hideColumn(self.voip_columns['start_time_unix'])
         self.tableview_voip.hideColumn(self.voip_columns['call_status'])
+        self.tableview_voip.hideColumn(self.voip_columns['cr'])
 
         self.tableview_voip.model().setHeaderData(self.voip_columns['start_time'], Qt.Horizontal, "Czas i data")
         self.tableview_voip.model().setHeaderData(self.voip_columns['calling_number'], Qt.Horizontal, "Nr telefonu")

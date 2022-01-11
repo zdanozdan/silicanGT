@@ -4,6 +4,7 @@ import sqlite3,pyodbc,phonenumbers
 import config as cfg
 import slack
 import time
+import csv,json
 
 LOCAL_DB = "mikran.sqlite"
 
@@ -23,10 +24,25 @@ def init_db():
         c.execute("ALTER TABLE config ADD sip_ip varchar(64)")
     except:
         pass
-    
-    data = (0,'192.168.0.2','5529','201','mikran123','192.168.0.140','MIKRAN','mikran_com','mikran_comqwer4321','','','','','')
+
+    f = open('config.json','r')
+    json_config = json.load(f)
+
     try:
-        c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", data)
+        values = list(json_config.values())
+        c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", values)
+    except:
+        pass
+
+    try:
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT sip_login,sip_password,sip_ip FROM config WHERE config_id=0")
+        row = c.fetchone()
+        config = dict(zip(row.keys(), row))
+        if not config['sip_login'] and not config['sip_password'] and not config['sip_ip']:
+            sql = "UPDATE config SET sip_login='%s',sip_password='%s',sip_ip='%s' WHERE config_id=0" % (json_config['sip_login'],json_config['sip_password'],json_config['sip_ip'])
+            c.execute(sql)
     except:
         pass
 

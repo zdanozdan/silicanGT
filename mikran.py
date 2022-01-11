@@ -566,6 +566,7 @@ class Window(QtWidgets.QMainWindow):
         self.tableview_voip.model().setHeaderData(self.voip_columns['adr_NIP'], Qt.Horizontal, "NIP")
         self.tableview_voip.model().setHeaderData(self.voip_columns['adr_Miejscowosc'], Qt.Horizontal, "Miejscowość")
         self.tableview_voip.model().setHeaderData(self.voip_columns['adr_Ulica'], Qt.Horizontal, "Ulica")
+        self.tableview_voip.model().setHeaderData(self.voip_columns['calls_state'], Qt.Horizontal, "Status")
 
     def addTabs(self,vbox):
         self.tabs = QtWidgets.QTabWidget()

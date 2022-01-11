@@ -20,7 +20,7 @@ import db,gt,config,silican,slack
 
 logging.basicConfig(filename='logfile.txt', level=logging.ERROR)
 
-VERSION_NUMBER = "1.4"
+VERSION_NUMBER = "2.0"
 
 Q1 = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer ORDER BY start_time_unix DESC"
 Q1_LIMIT = "SELECT * FROM current_calls LEFT JOIN users ON current_calls.calling_number = users.tel_Numer LIMIT 1"
@@ -796,7 +796,9 @@ class MikranTableModel(QtSql.QSqlTableModel):
            if v == 'Connect_ST':
                self._color = QtCore.Qt.green
                login = self.record(index.row()).value("login")
-               return "Odebrane u mnie (%s)" % login
+               if login:
+                   return "Odebrane u mnie (%s)" % login
+               return "Odebrane u mnie"           
            if v == 'call_intercepted':
                self._color = QtCore.Qt.green
                return "Odebrane w grupie"

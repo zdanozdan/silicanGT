@@ -253,7 +253,7 @@ class Window(QtWidgets.QMainWindow):
                 self._signal.emit(("INFOLINE_NUMBER",calling_number))
 
             unix_time = int(time.time())
-            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_status,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,config.VOIP_NEW,unix_time)
+            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_status,start_time_unix,calls_state) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,config.VOIP_NEW,unix_time,'NewCallInfoline_ST')
                         
             self._signal.emit(("SQL",sql))
         except Exception as e:
@@ -793,6 +793,9 @@ class MikranTableModel(QtSql.QSqlTableModel):
            if v == 'NewCall_ST':
                self._color = QtCore.Qt.yellow
                return "Nowe połączenie"
+           if v == 'NewCallInfoline_ST':
+               self._color = QtCore.Qt.yellow
+               return "Na infolinii"
            if v == 'Connect_ST':
                self._color = QtCore.Qt.green
                login = self.record(index.row()).value("login")

@@ -125,7 +125,7 @@ class SilicanListener:
                 unix_time = int(time.time())
                 calling = calling.lstrip('0')
 
-                sql = "UPDATE voip_calls_dev SET silican_ringing = CASE WHEN silican_ringing IS NULL THEN '%s' ELSE silican_ringing+',%s' END WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls_dev WHERE calling_number='%s' ORDER BY start_time_unix DESC) " % (self._login,self._login,calling)
+                sql = "UPDATE voip_calls SET silican_ringing = CASE WHEN silican_ringing IS NULL THEN '%s' ELSE silican_ringing+',%s' END WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC) " % (self._login,self._login,calling)
 
                 print(sql)
                 db_service.execute(self.cursor,sql)
@@ -157,13 +157,13 @@ class SilicanListener:
 
             if calls_state == "Connect_ST":
                 calling = calling.lstrip('0')
-                sql = "UPDATE voip_calls_dev SET call_received_cr='%s', call_received='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls_dev WHERE calling_number='%s' ORDER BY start_time_unix DESC)" % (cr,self._login,calling)
-                print(sql)
+                sql = "UPDATE voip_calls SET call_received_cr='%s', call_received='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' ORDER BY start_time_unix DESC)" % (cr,self._login,calling)
                 db_service.execute(self.cursor,sql)
 
             if calls_state == "Release_ST":
+                calling = calling.lstrip('0')
                 unix_time = int(time.time())
-                sql = "UPDATE voip_calls_dev SET stop_time_unix='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls_dev WHERE calling_number='%s' AND call_received_cr='%s' ORDER BY start_time_unix DESC)" % (unix_time,calling,cr)
+                sql = "UPDATE voip_calls SET stop_time_unix='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' AND call_received_cr='%s' ORDER BY start_time_unix DESC)" % (unix_time,calling,cr)
                 print(sql)
                 db_service.execute(self.cursor,sql)
 
@@ -198,7 +198,7 @@ class SipListener:
             print("Number calling: ",calling_number)
         
             unix_time = int(time.time())
-            sql = "INSERT INTO voip_calls_dev (call_id,start_time,calling_number,call_to,call_from,call_received,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,0,unix_time)
+            sql = "INSERT INTO voip_calls (call_id,start_time,calling_number,call_to,call_from,call_received,start_time_unix) VALUES ('%s','%s','%s','%s','%s','%s','%s')" % (call_id,datetime.datetime.now().strftime("%m-%d-%Y, %H:%M:%S"),calling_number,call_to,call_from,0,unix_time)
 
             print(sql)
             db_service.execute(self.cursor,sql)

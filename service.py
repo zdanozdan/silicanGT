@@ -213,12 +213,11 @@ if __name__ == "__main__":
     listener = SipListener()
     listener.start()
 
-
-#    config = db_service.load_config(cursor)
-#    logins = config['login'].split(",")
+    config = db_service.load_config(cursor)
+    logins = config['login'].split(",")
     #logins = ['201','202']
-#    password = config['password']
-#    for login in logins:
-#        listener = SilicanListener()
-#        listener.start(login,password,config)
-#        time.sleep(1)
+    password = config['password']
+    for login in logins:
+        listener = SilicanListener()
+        listener.start(login,password,config)
+        time.sleep(1)

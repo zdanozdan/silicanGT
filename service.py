@@ -161,10 +161,8 @@ class SilicanListener:
                 db_service.execute(self.cursor,sql)
 
             if calls_state == "Release_ST":
-                calling = calling.lstrip('0')
                 unix_time = int(time.time())
-                sql = "UPDATE voip_calls SET stop_time_unix='%s' WHERE call_id=(SELECT TOP 1 call_id FROM voip_calls WHERE calling_number='%s' AND call_received_cr='%s' ORDER BY start_time_unix DESC)" % (unix_time,calling,cr)
-                print(sql)
+                sql = "UPDATE voip_calls SET stop_time_unix='%s' WHERE call_received_cr='%s'" % (unix_time,cr)
                 db_service.execute(self.cursor,sql)
 
 class SipListener:
